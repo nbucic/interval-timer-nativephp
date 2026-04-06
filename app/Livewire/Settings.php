@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enum\BeepLeadIn;
-use App\Models\Setting;
+use App\Timer\AppSettings;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\View\View;
+use JsonException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -26,13 +27,13 @@ class Settings extends Component
 
     public function mount(): void
     {
-        $settings = Setting::current();
+        $settings = AppSettings::load();
 
-        $this->defaultBeepLeadIn = $settings->default_beep_lead_in;
-        $this->defaultEndSound   = $settings->default_end_sound;
-        $this->soundMode         = $settings->sound_mode;
-        $this->volume            = $settings->volume;
-        $this->keepScreenOn      = $settings->keep_screen_on;
+        $this->defaultBeepLeadIn = $settings->defaultBeepLeadIn;
+        $this->defaultEndSound = $settings->defaultEndSound;
+        $this->soundMode = $settings->soundMode;
+        $this->volume = $settings->volume;
+        $this->keepScreenOn = $settings->keepScreenOn;
     }
 
     public function render(): View
@@ -40,23 +41,26 @@ class Settings extends Component
         return view('livewire.settings');
     }
 
+    /**
+     * @throws JsonException
+     */
     public function save(): void
     {
         $this->validate([
             'defaultBeepLeadIn' => ['required', new Enum(BeepLeadIn::class)],
-            'defaultEndSound'   => 'required|in:triple,chime',
-            'soundMode'         => 'required|in:beep,voice',
-            'volume'            => 'required|numeric|min:0|max:1',
-            'keepScreenOn'      => 'boolean',
+            'defaultEndSound' => 'required|in:triple,chime',
+            'soundMode' => 'required|in:beep,voice',
+            'volume' => 'required|numeric|min:0|max:1',
+            'keepScreenOn' => 'boolean',
         ]);
 
-        $settings = Setting::current();
+        $settings = AppSettings::load();
 
-        $settings->default_beep_lead_in = $this->defaultBeepLeadIn;
-        $settings->default_end_sound    = $this->defaultEndSound;
-        $settings->sound_mode           = $this->soundMode;
-        $settings->volume               = round((float) $this->volume, 2);
-        $settings->keep_screen_on       = $this->keepScreenOn;
+        $settings->defaultBeepLeadIn = $this->defaultBeepLeadIn;
+        $settings->defaultEndSound = $this->defaultEndSound;
+        $settings->soundMode = $this->soundMode;
+        $settings->volume = round((float)$this->volume, 2);
+        $settings->keepScreenOn = $this->keepScreenOn;
 
         $settings->save();
 

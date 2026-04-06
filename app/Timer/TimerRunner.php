@@ -7,9 +7,6 @@ namespace App\Timer;
 use App\Enum\StateMachine;
 use App\Events\PhaseChanged;
 use App\Events\ProgramCompleted;
-use App\Jobs\WriteHistoryEntry;
-use App\Models\Phase;
-use App\Models\Program;
 use Closure;
 use RuntimeException;
 
@@ -30,33 +27,30 @@ use RuntimeException;
  * Resume restores to the previous active state.
  *
  * Beep rule: fire the segment-appropriate end beep based on the expired state.
- *   'Running' → 'rep_end'
- *   'Pause' → 'pause_end'
- *   'Cooldown' → 'cooldown_end'
+ *   running → 'rep_end'
+ *   pause → 'pause_end'
+ *   cooldown → 'cooldown_end'
  *
  * Countdown beep fires during the last N seconds of each segment (lead-in).
  * If a segment < lead-in, the countdown starts from second 1.
  */
 class TimerRunner
 {
-    private const PREPARE_SECONDS = 5;
-
-    private ?Program $program = null;
-    public TimerCursor $cursor {
-        set {
-            $this->cursor = $value;
-        }
-    }
+    private ?TimerProgram $program = null;
+    private TimerCursor   $cursor;
 
     /** State before the user pressed pause — needed for resume. */
     private StateMachine $stateBeforePause = StateMachine::running;
 
     /** Callable invoked each time the cursor changes: fn(TimerCursor) */
-    private ?Closure $onTick = null;
+    private ?Closure $onTick     = null;
     /** Callable invoked when a beep should fire: fn(string $reason) */
-    private ?Closure $onBeep = null;
+    private ?Closure $onBeep     = null;
     /** Callable for the single pause-beep: fn() */
     private ?Closure $onPauseBeep = null;
+
+    /** Fake-clock override (seconds since epoch) — set in tests. */
+    private ?Closure $clockFn = null;
 
     public function __construct()
     {
@@ -65,143 +59,54 @@ class TimerRunner
 
     // ── Public accessors ──────────────────────────────────────────────────────
 
-    public function cursor(): TimerCursor
-    {
-        return $this->cursor;
-    }
-
-    /** Silent discard — no history entry, no ProgramCompleted event. */
-    public function discard(): void
-    {
-        $this->program = null;
-        $this->cursor = TimerCursor::idle();
-    }
-
-    /** Load a program and reset the cursor to idle. */
-    public function load(Program $program): void
-    {
-        $this->program = $program;
-        $this->cursor = TimerCursor::idle();
-    }
-
-    public function onBeep(Closure $fn): void
-    {
-        $this->onBeep = $fn;
-    }
+    public function cursor(): TimerCursor    { return $this->cursor; }
+    public function program(): ?TimerProgram { return $this->program; }
+    public function isIdle(): bool           { return $this->cursor->isIdle(); }
+    public function isRunning(): bool        { return $this->cursor->isRunning(); }
+    public function isPaused(): bool         { return $this->cursor->isPaused(); }
+    public function isCompleted(): bool      { return $this->cursor->isCompleted(); }
 
     // ── Callback registration ─────────────────────────────────────────────────
 
-    public function onPauseBeep(Closure $fn): void
-    {
-        $this->onPauseBeep = $fn;
-    }
+    public function onTick(Closure $fn): void      { $this->onTick = $fn; }
+    public function onBeep(Closure $fn): void      { $this->onBeep = $fn; }
+    public function onPauseBeep(Closure $fn): void { $this->onPauseBeep = $fn; }
 
-    public function onTick(Closure $fn): void
-    {
-        $this->onTick = $fn;
-    }
-
-    /** User-initiated pause (or PhoneStateListener). Cannot pause during prepare. */
-    public function pause(): void
-    {
-        if (!$this->cursor->isActive()) {
-            return;
-        }
-
-        if ($this->cursor->state === StateMachine::prepare) {
-            return;
-        }
-
-        $this->stateBeforePause = $this->cursor->state;
-        $this->cursor = $this->cursor->pause();
-        $this->fireOnPauseBeep();
-        $this->notifyTick();
-    }
-
-    private function fireOnPauseBeep(): void
-    {
-        if ($this->onPauseBeep !== null) {
-            ($this->onPauseBeep)();
-        }
-    }
-
-    public function program(): ?Program
-    {
-        return $this->program;
-    }
+    /** Override the clock for tests. fn(): int (seconds since epoch) */
+    public function setClock(Closure $fn): void    { $this->clockFn = $fn; }
 
     // ── Control surface ───────────────────────────────────────────────────────
 
-    /** Resume from the user-paused state, restoring the pre-pause substate. */
-    public function resume(): void
+    /** Load a program and reset the cursor to idle. */
+    public function load(TimerProgram $program): void
     {
-        if (!$this->cursor->isPaused()) {
-            return;
-        }
-
-        $this->cursor = $this->cursor->resumeAs($this->stateBeforePause);
-        $this->notifyTick();
+        $this->program = $program;
+        $this->cursor  = TimerCursor::idle();
     }
 
-    /** Start the timer from idle — enters a 5-second PREPARE countdown first. */
+    /** Start the timer from idle. */
     public function start(): void
     {
         $this->assertProgramLoaded();
 
-        if (!$this->isIdle()) {
+        if (! $this->isIdle()) {
             throw new RuntimeException(
                 "Cannot start: expected state 'idle', got '{$this->cursor->state->value}'.",
             );
         }
 
-        $this->cursor = $this->cursor->enterPrepare(self::PREPARE_SECONDS);
-    }
-
-    /** Transition from prepare → running, initialising the first rep. */
-    private function beginFirstRep(): void
-    {
-        $phase = $this->currentPhase();
+        $phase          = $this->currentPhase();
         $totalRemaining = $this->program->totalDuration();
 
         $this->cursor = new TimerCursor(
-            phaseIndex: 0,
-            repIndex: 0,
-            state: StateMachine::running,
-            remaining: $phase->duration,
+            phaseIndex:     0,
+            repIndex:       0,
+            state:          StateMachine::running,
+            remaining:      $phase->duration,
             totalRemaining: $totalRemaining,
         );
 
         PhaseChanged::dispatch($this->program->id, 0, $phase, 0);
-        $this->notifyTick();
-    }
-
-    private function assertProgramLoaded(): void
-    {
-        if ($this->program === null) {
-            throw new RuntimeException('No program loaded. Call load() first.');
-        }
-        if ($this->program->phases->isEmpty()) {
-            throw new RuntimeException('Program has no phases.');
-        }
-    }
-
-    // ── State machine ─────────────────────────────────────────────────────────
-
-    public function isIdle(): bool
-    {
-        return $this->cursor->isIdle();
-    }
-
-    private function currentPhase(): Phase
-    {
-        return array_first($this->phases())
-            ?? throw new RuntimeException('Program has no phases.');
-    }
-
-    /** @return Phase[] */
-    private function phases(): array
-    {
-        return $this->program->phases->all();
     }
 
     /**
@@ -210,23 +115,11 @@ class TimerRunner
      */
     public function tick(): void
     {
-        if (!$this->cursor->isActive()) {
+        if (! $this->cursor->isActive()) {
             return;
         }
 
         $cursor = $this->cursor->tick();
-
-        // Prepare: beep every second (bypass lead-in logic), transition when done
-        if ($cursor->state === StateMachine::prepare) {
-            if ($cursor->remaining > 0) {
-                $this->fireBeep('prepare');
-                $this->cursor = $cursor;
-                $this->notifyTick();
-            } else {
-                $this->beginFirstRep();
-            }
-            return;
-        }
 
         if ($this->shouldBeep($cursor)) {
             $this->fireBeep('countdown');
@@ -241,51 +134,38 @@ class TimerRunner
         $this->advance($cursor);
     }
 
-    // ── Beep helpers ──────────────────────────────────────────────────────────
-
-    /**
-     * True when the cursor's remaining falls within the lead-in countdown window.
-     * Uses beep_lead_in->value to extract the int from the BeepLeadIn backed enum.
-     */
-    private function shouldBeep(TimerCursor $cursor): bool
+    /** User-initiated pause (or PhoneStateListener). */
+    public function pause(): void
     {
-        if (!$cursor->isActive()) {
-            return false;
+        if (! $this->cursor->isActive()) {
+            return;
         }
 
-        $leadIn = $this->program->beep_lead_in->value;
-        $segmentTotal = $this->segmentDurationForCursor($cursor);
-        $effectiveLead = ($segmentTotal < $leadIn) ? max(1, $segmentTotal - 1) : $leadIn;
-
-        return $cursor->remaining <= $effectiveLead && $cursor->remaining > 0;
+        $this->stateBeforePause = $this->cursor->state;
+        $this->cursor           = $this->cursor->pause();
+        $this->fireOnPauseBeep();
+        $this->notifyTick();
     }
 
-    private function segmentDurationForCursor(TimerCursor $cursor): int
+    /** Resume from the user-paused state, restoring the pre-pause substate. */
+    public function resume(): void
     {
-        $phase = $this->phases()[$cursor->phaseIndex];
-
-        return match ($cursor->state) {
-            StateMachine::prepare  => self::PREPARE_SECONDS,
-            StateMachine::running  => $phase->duration,
-            StateMachine::pause    => $phase->pause,
-            StateMachine::cooldown => $phase->cooldown,
-            default                => 0,
-        };
-    }
-
-    private function fireBeep(string $reason): void
-    {
-        if ($this->onBeep !== null) {
-            ($this->onBeep)($reason);
+        if (! $this->cursor->isPaused()) {
+            return;
         }
+
+        $this->cursor = $this->cursor->resumeAs($this->stateBeforePause);
+        $this->notifyTick();
     }
 
-    private function notifyTick(): void
+    /** Silent discard — no history entry, no ProgramCompleted event. */
+    public function discard(): void
     {
-        if ($this->onTick !== null) {
-            ($this->onTick)($this->cursor);
-        }
+        $this->program = null;
+        $this->cursor  = TimerCursor::idle();
     }
+
+    // ── State machine ─────────────────────────────────────────────────────────
 
     /**
      * Called when cursor->remaining hits 0.
@@ -293,8 +173,8 @@ class TimerRunner
      */
     private function advance(TimerCursor $cursor): void
     {
-        $phase = $this->phases()[$cursor->phaseIndex];
-        $isLastRep = ($cursor->repIndex >= $phase->repetitions - 1);
+        $phase       = $this->phases()[$cursor->phaseIndex];
+        $isLastRep   = ($cursor->repIndex >= $phase->repetitions - 1);
         $isLastPhase = ($cursor->phaseIndex >= count($this->phases()) - 1);
 
         // ── Pause segment expired → next rep ──────────────────────────────
@@ -314,7 +194,7 @@ class TimerRunner
         // ── Running rep expired ───────────────────────────────────────────
         $this->fireBeep('rep_end');
 
-        if (!$isLastRep && $phase->pause > 0) {
+        if (! $isLastRep && $phase->pause > 0) {
             $this->cursor = $cursor->enterPause(
                 $phase->pause,
                 max(0, $cursor->totalRemaining),
@@ -323,13 +203,13 @@ class TimerRunner
             return;
         }
 
-        if (!$isLastRep) {
+        if (! $isLastRep) {
             $this->advanceToNextRep($cursor, $phase);
             return;
         }
 
         // Last rep → cooldown (always executes, even as the last phase's last rep).
-        if ($phase->cooldown > 0 && !$isLastPhase) {
+        if ($phase->cooldown > 0) {
             $this->cursor = $cursor->enterCooldown(
                 $phase->cooldown,
                 max(0, $cursor->totalRemaining),
@@ -341,8 +221,6 @@ class TimerRunner
         // Zero-second cooldown: proceed immediately.
         $this->advanceAfterCooldown($cursor, $isLastPhase);
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function advanceToNextRep(TimerCursor $cursor, Phase $phase): void
     {
@@ -361,7 +239,7 @@ class TimerRunner
         }
 
         $nextPhaseIndex = $cursor->phaseIndex + 1;
-        $nextPhase = $this->phases()[$nextPhaseIndex];
+        $nextPhase      = $this->phases()[$nextPhaseIndex];
 
         $this->cursor = $cursor->nextPhase(
             $nextPhaseIndex,
@@ -377,22 +255,90 @@ class TimerRunner
     {
         $this->cursor = $this->cursor->complete();
 
-        $totalDuration = $this->program->totalDuration();
-
         ProgramCompleted::dispatch(
             $this->program->id,
-            $this->program->end_sound,
-            $totalDuration,
-        );
-
-        WriteHistoryEntry::dispatch(
-            $this->program->id,
-            $this->program->name,
-            now()->toISOString(),
-            $totalDuration,
+            $this->program->endSound,
+            $this->program->totalDuration(),
         );
 
         $this->program->touch();
         $this->notifyTick();
+    }
+
+    // ── Beep helpers ──────────────────────────────────────────────────────────
+
+    /**
+     * True when the cursor's remaining falls within the lead-in countdown window.
+     * Uses beepLeadIn->value to extract the int from the BeepLeadIn backed enum.
+     */
+    private function shouldBeep(TimerCursor $cursor): bool
+    {
+        if (! $cursor->isActive()) {
+            return false;
+        }
+
+        $leadIn       = $this->program->beepLeadIn->value;  // BeepLeadIn: int enum
+        $segmentTotal = $this->segmentDurationForCursor($cursor);
+        $effectiveLead = ($segmentTotal < $leadIn) ? max(1, $segmentTotal - 1) : $leadIn;
+
+        return $cursor->remaining <= $effectiveLead && $cursor->remaining > 0;
+    }
+
+    private function segmentDurationForCursor(TimerCursor $cursor): int
+    {
+        $phase = $this->phases()[$cursor->phaseIndex];
+
+        return match ($cursor->state) {
+            StateMachine::running  => $phase->duration,
+            StateMachine::pause    => $phase->pause,
+            StateMachine::cooldown => $phase->cooldown,
+            default                => 0,
+        };
+    }
+
+    private function fireBeep(string $reason): void
+    {
+        if ($this->onBeep !== null) {
+            ($this->onBeep)($reason);
+        }
+    }
+
+    private function fireOnPauseBeep(): void
+    {
+        if ($this->onPauseBeep !== null) {
+            ($this->onPauseBeep)();
+        }
+    }
+
+    private function notifyTick(): void
+    {
+        if ($this->onTick !== null) {
+            ($this->onTick)($this->cursor);
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function assertProgramLoaded(): void
+    {
+        if ($this->program === null) {
+            throw new RuntimeException('No program loaded. Call load() first.');
+        }
+        if (count($this->program->phases) === 0) {
+            throw new RuntimeException('Program has no phases.');
+        }
+    }
+
+    private function currentPhase(): Phase
+    {
+        // PHP 8.5: array_first_value($this->phases())
+        return ($this->phases()[0] ?? null)
+            ?? throw new RuntimeException('Program has no phases.');
+    }
+
+    /** @return Phase[] */
+    private function phases(): array
+    {
+        return $this->program->phases;
     }
 }
