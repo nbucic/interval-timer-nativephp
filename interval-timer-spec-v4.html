@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interval Timer — Spec v4</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Barlow+Condensed:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface2: #181818;
+  --border: #222222;
+  --border2: #2a2a2a;
+  --blue: #2563eb;
+  --blue-light: #3b82f6;
+  --blue-dim: rgba(37,99,235,0.15);
+  --orange: #ea580c;
+  --orange-light: #f97316;
+  --orange-dim: rgba(234,88,12,0.15);
+  --green: #16a34a;
+  --green-light: #22c55e;
+  --green-dim: rgba(22,163,74,0.12);
+  --red-light: #ef4444;
+  --text: #e8e8e8;
+  --muted: #555;
+  --muted2: #777;
+  --sans: 'Rajdhani', sans-serif;
+  --display: 'Barlow Condensed', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+#bgCanvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.5; }
+.progress-bar { position: fixed; top: 0; left: 0; height: 2px; background: linear-gradient(90deg, var(--blue), var(--orange)); width: 0%; z-index: 200; transition: width 0.08s; }
+.toc { position: fixed; right: 16px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+.toc-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border2); cursor: pointer; transition: all 0.2s; }
+.toc-dot.active { background: var(--orange); transform: scale(1.8); }
+.toc-dot:hover { background: var(--blue-light); transform: scale(1.5); }
+@media(max-width:768px){ .toc { display: none; } }
+.container { max-width: 960px; margin: 0 auto; padding: 0 28px 100px; position: relative; z-index: 1; }
+
+/* ── HEADER ── */
+header { padding: 64px 0 48px; border-bottom: 1px solid var(--border); margin-bottom: 56px; }
+.eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.badge { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; padding: 4px 10px; border-radius: 2px; }
+.b-blue   { background: var(--blue-dim); color: var(--blue-light); border: 1px solid rgba(59,130,246,0.3); }
+.b-orange { background: var(--orange-dim); color: var(--orange-light); border: 1px solid rgba(249,115,22,0.3); }
+.b-green  { background: var(--green-dim); color: var(--green-light); border: 1px solid rgba(34,197,94,0.3); }
+.b-grey   { background: #1a1a1a; color: var(--muted2); border: 1px solid var(--border2); }
+h1 { font-family: var(--display); font-size: clamp(3rem, 7vw, 5.8rem); font-weight: 800; line-height: 0.92; letter-spacing: -0.01em; text-transform: uppercase; margin-bottom: 16px; }
+h1 .w-blue { color: var(--blue-light); }
+h1 .w-orange { color: var(--orange-light); }
+h1 .w-dim { color: #2a2a2a; }
+.header-sub { font-size: 14px; font-weight: 500; color: var(--muted2); max-width: 580px; line-height: 1.65; margin-bottom: 24px; }
+.meta-row { display: flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.meta-cell { padding: 10px 18px; border-right: 1px solid var(--border); font-family: var(--mono); font-size: 10px; }
+.meta-cell:last-child { border-right: none; }
+.mc-label { color: var(--muted); display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px; }
+.mc-val { color: var(--text); font-weight: 700; }
+.mc-val.blue { color: var(--blue-light); }
+.mc-val.orange { color: var(--orange-light); }
+.mc-val.green { color: var(--green-light); }
+
+/* ── SECTIONS ── */
+.section { margin-bottom: 56px; opacity: 0; transform: translateY(16px); transition: opacity 0.4s ease, transform 0.4s ease; }
+.section.visible { opacity: 1; transform: none; }
+.section-header { display: flex; align-items: center; margin-bottom: 22px; cursor: pointer; user-select: none; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.sec-num { font-family: var(--mono); font-size: 10px; color: var(--orange); width: 36px; letter-spacing: 1px; }
+h2 { font-family: var(--display); font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; flex: 1; }
+.toggle { font-family: var(--mono); font-size: 12px; color: var(--muted); transition: transform 0.3s; }
+.section-body { overflow: hidden; transition: max-height 0.4s ease; }
+.section-body.collapsed { max-height: 0 !important; }
+
+/* ── CARDS ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 20px; margin-bottom: 10px; }
+.card-title { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; color: var(--blue-light); }
+.card-title.orange { color: var(--orange-light); }
+.card-title.green { color: var(--green-light); }
+.card p, .card li { font-size: 13px; color: #888; line-height: 1.7; font-weight: 500; }
+.card ul { padding-left: 18px; }
+.card li { margin-bottom: 6px; }
+.card strong { color: var(--text); font-weight: 600; }
+code { font-family: var(--mono); font-size: 11px; background: #1a1a1a; padding: 2px 6px; border-radius: 2px; color: var(--orange-light); border: 1px solid var(--border2); }
+.callout { border-left: 3px solid var(--orange); background: var(--orange-dim); padding: 14px 18px; margin-bottom: 10px; border-radius: 0 4px 4px 0; font-size: 13px; color: #fdba74; line-height: 1.6; font-weight: 500; }
+.callout strong { color: var(--orange-light); }
+.callout.blue { border-left-color: var(--blue); background: var(--blue-dim); color: #93c5fd; }
+.callout.blue strong { color: var(--blue-light); }
+.callout.green { border-left-color: var(--green); background: var(--green-dim); color: #86efac; }
+.callout.green strong { color: var(--green-light); }
+.divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+/* ── STACK TABLE ── */
+.stack { border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.stack-row { display: grid; grid-template-columns: 90px 1fr 2fr auto; align-items: start; padding: 13px 18px; border-bottom: 1px solid var(--border); gap: 14px; transition: background 0.15s; }
+.stack-row:last-child { border-bottom: none; }
+.stack-row:hover { background: var(--surface2); }
+.s-layer { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; padding-top: 3px; }
+.s-name { font-family: var(--display); font-weight: 700; font-size: 15px; }
+.s-why { font-size: 12px; color: #666; line-height: 1.5; font-weight: 500; }
+.s-tag { font-family: var(--mono); font-size: 9px; padding: 3px 8px; border-radius: 2px; white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; }
+.t-blue   { background: var(--blue-dim); color: var(--blue-light); }
+.t-orange { background: var(--orange-dim); color: var(--orange-light); }
+.t-green  { background: var(--green-dim); color: var(--green-light); }
+.t-grey   { background: #1a1a1a; color: var(--muted2); }
+.t-new    { background: rgba(22,163,74,0.25); color: var(--green-light); border: 1px solid rgba(34,197,94,0.4); }
+
+/* ── FEATURE GRID ── */
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.feat { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 18px; transition: border-color 0.2s, transform 0.2s; }
+.feat:hover { border-color: var(--orange); transform: translateY(-2px); }
+.feat-icon { font-size: 20px; margin-bottom: 8px; }
+.feat-name { font-family: var(--display); font-weight: 700; font-size: 14px; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.05em; }
+.feat-desc { font-size: 12px; color: #666; line-height: 1.55; font-weight: 500; }
+.feat-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.p-mvp  { font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:2px; background:var(--blue-dim); color:var(--blue-light); letter-spacing:1px; }
+.p-v11  { font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:2px; background:var(--orange-dim); color:var(--orange-light); letter-spacing:1px; }
+.p-nice { font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:2px; background:#1a1a1a; color:var(--muted2); letter-spacing:1px; }
+.p-watch{ font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:2px; background:rgba(234,88,12,0.25); color:var(--orange); letter-spacing:1px; border:1px solid rgba(234,88,12,0.4); }
+
+/* ── DATA MODELS ── */
+.model-box { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px; overflow: hidden; }
+.model-header { background: #141414; padding: 10px 18px; font-family: var(--mono); font-size: 11px; color: var(--blue-light); border-bottom: 1px solid var(--border); letter-spacing: 1px; text-transform: uppercase; }
+.field-row { display: grid; grid-template-columns: 180px 130px 1fr; gap: 12px; padding: 9px 18px; font-family: var(--mono); font-size: 11px; border-bottom: 1px solid #181818; align-items: start; }
+.field-row:last-child { border-bottom: none; }
+.f-name { color: var(--text); }
+.f-type { color: var(--orange-light); }
+.f-note { color: var(--muted2); font-size: 10px; padding-top: 1px; line-height: 1.4; }
+
+/* ── JSON BLOCK ── */
+.json-block { background: #0d0d0d; border: 1px solid var(--border2); border-radius: 4px; padding: 16px; font-family: var(--mono); font-size: 11px; line-height: 1.85; color: #666; overflow-x: auto; }
+.jk { color: #888; }
+.jv-str { color: var(--blue-light); }
+.jv-num { color: var(--orange-light); }
+.jv-bool { color: var(--green-light); }
+.jv-key { color: #aaa; }
+.jv-c { color: #3a3a3a; font-style: italic; }
+
+/* ── ROADMAP ── */
+.phase { display: flex; gap: 16px; margin-bottom: 16px; }
+.ph-dot { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; font-weight: 700; margin-top: 2px; }
+.ph1 { background: var(--blue-dim); color: var(--blue-light); border: 1px solid var(--blue); }
+.ph2 { background: var(--orange-dim); color: var(--orange-light); border: 1px solid var(--orange); }
+.ph3 { background: #181818; color: var(--muted2); border: 1px solid var(--border2); }
+.ph4 { background: rgba(234,88,12,0.2); color: var(--orange); border: 1px solid rgba(234,88,12,0.5); }
+.ph-title { font-family: var(--display); font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+.ph-items { font-size: 12px; color: #666; line-height: 1.9; font-weight: 500; }
+
+/* ── CHECKLIST ── */
+.checklist { list-style: none; }
+.checklist li { display: flex; gap: 10px; padding: 9px 0; font-size: 13px; color: #777; font-weight: 500; border-bottom: 1px solid #161616; align-items: flex-start; cursor: pointer; transition: color 0.15s; }
+.checklist li:last-child { border-bottom: none; }
+.checklist li:hover { color: var(--text); }
+.ch-box { width: 15px; height: 15px; border: 1px solid var(--border2); border-radius: 2px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; margin-top: 2px; transition: all 0.15s; }
+.checklist li.done .ch-box { background: var(--orange); border-color: var(--orange); color: #000; }
+.checklist li.done span { text-decoration: line-through; color: var(--muted); }
+
+/* ── TEST TABLE ── */
+.test-table { border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.test-row { display: grid; grid-template-columns: 190px 1fr auto; border-bottom: 1px solid var(--border); }
+.test-row:last-child { border-bottom: none; }
+.test-row.hdr { background: #141414; }
+.tc { padding: 11px 16px; border-right: 1px solid var(--border); font-size: 12px; }
+.tc:last-child { border-right: none; }
+.test-row.hdr .tc { font-family: var(--mono); font-size: 9px; color: var(--muted2); text-transform: uppercase; letter-spacing: 1px; }
+.ts { font-family: var(--mono); font-size: 10px; color: var(--orange-light); font-weight: 700; }
+.tcase { color: #888; font-weight: 500; line-height: 1.5; }
+.tp-crit { font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:2px; background:rgba(220,38,38,0.15); color:var(--red-light); white-space:nowrap; }
+.tp-high { font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:2px; background:var(--orange-dim); color:var(--orange-light); white-space:nowrap; }
+.tp-med  { font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:2px; background:var(--blue-dim); color:var(--blue-light); white-space:nowrap; }
+
+/* ── TRANSFER ── */
+.transfer-box { background: var(--surface); border: 1px solid rgba(37,99,235,0.4); border-radius: 4px; padding: 24px; }
+.transfer-box h3 { font-family: var(--display); font-size: 1.1rem; font-weight: 700; color: var(--blue-light); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+.code-block { background: #080808; border: 1px solid var(--border); border-radius: 3px; padding: 16px; font-family: var(--mono); font-size: 11px; color: #5a8a6a; margin: 12px 0; white-space: pre-wrap; line-height: 1.75; overflow-x: auto; }
+.copy-btn { background: var(--blue); color: #fff; border: none; border-radius: 3px; padding: 9px 20px; font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: background 0.2s; }
+.copy-btn:hover { background: var(--blue-light); }
+.copy-btn.copied { background: var(--orange); }
+
+/* ══════════════════════════════════════════
+   PLAYGROUND STYLES
+══════════════════════════════════════════ */
+.playground {
+  background: #0d0d0d;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+/* builder */
+.pg-builder {
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.pg-title {
+  font-family: var(--mono); font-size: 10px; color: var(--orange-light);
+  text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px;
+}
+.pg-phases { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+
+.pg-phase-row {
+  display: grid;
+  grid-template-columns: 1fr 60px 46px 60px 64px 60px 32px;
+  gap: 6px; align-items: center;
+}
+@media(max-width:640px){
+  .pg-phase-row { grid-template-columns: 1fr 1fr 1fr; }
+  .pg-phase-row > *:nth-child(n+6) { display: none; }
+}
+
+.pg-phase-row input, .pg-phase-row select {
+  background: #1a1a1a; border: 1px solid var(--border2); border-radius: 3px;
+  color: var(--text); font-family: var(--mono); font-size: 10px;
+  padding: 5px 7px; width: 100%; outline: none;
+  transition: border-color 0.15s;
+}
+.pg-phase-row input:focus, .pg-phase-row select:focus { border-color: var(--blue-light); }
+.pg-phase-row input[type=color] { padding: 2px; height: 28px; cursor: pointer; }
+
+.pg-col-label {
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px; text-align: center;
+}
+.pg-col-labels {
+  display: grid;
+  grid-template-columns: 1fr 60px 46px 60px 64px 60px 32px;
+  gap: 6px; margin-bottom: 4px;
+}
+
+.btn-del {
+  background: rgba(220,38,38,0.15); border: 1px solid rgba(220,38,38,0.3);
+  color: var(--red-light); border-radius: 3px; cursor: pointer;
+  font-size: 13px; width: 32px; height: 28px; display: flex;
+  align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0;
+}
+.btn-del:hover { background: rgba(220,38,38,0.3); }
+
+.pg-controls-row {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
+}
+.btn-add-phase {
+  background: var(--blue-dim); border: 1px dashed rgba(59,130,246,0.4);
+  color: var(--blue-light); border-radius: 3px; cursor: pointer;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+  padding: 6px 14px; transition: background 0.15s;
+}
+.btn-add-phase:hover { background: rgba(37,99,235,0.25); }
+.btn-add-phase:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.pg-setting {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 10px; color: var(--muted2);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.pg-setting select {
+  background: #1a1a1a; border: 1px solid var(--border2); border-radius: 3px;
+  color: var(--text); font-family: var(--mono); font-size: 10px;
+  padding: 4px 8px; outline: none;
+}
+
+.pg-summary {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  background: #141414; border-radius: 4px; padding: 10px 14px;
+  margin-top: 10px;
+}
+.pg-sum-item { font-family: var(--mono); font-size: 10px; }
+.pg-sum-label { color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-right: 6px; }
+.pg-sum-val { color: var(--orange-light); font-weight: 700; }
+.pg-sum-val.blue { color: var(--blue-light); }
+
+/* timer display */
+.pg-timer {
+  padding: 40px 28px 32px;
+  display: flex; flex-direction: column; align-items: center;
+  transition: background 0.7s ease;
+  min-height: 420px; justify-content: center; position: relative;
+  border-top: 1px solid var(--border);
+}
+
+.timer-phase-label {
+  font-family: var(--display); font-size: 1.1rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.25em;
+  color: rgba(255,255,255,0.45); margin-bottom: 10px;
+  min-height: 28px; text-align: center;
+}
+
+.timer-state-badge {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
+  text-transform: uppercase; padding: 4px 12px; border-radius: 2px;
+  margin-bottom: 20px; min-height: 24px;
+}
+.sb-running  { background: rgba(34,197,94,0.2);  color: var(--green-light); }
+.sb-pause    { background: rgba(37,99,235,0.2);   color: var(--blue-light); }
+.sb-cooldown { background: rgba(249,115,22,0.2);  color: var(--orange-light); }
+.sb-idle     { background: #1a1a1a; color: var(--muted2); }
+.sb-done     { background: rgba(34,197,94,0.25);  color: var(--green-light); }
+.sb-paused   { background: rgba(255,200,0,0.15);  color: #fbbf24; }
+
+/* big countdown */
+.timer-main {
+  font-family: var(--display); font-size: clamp(5.5rem, 16vw, 10rem);
+  font-weight: 800; line-height: 1; letter-spacing: -0.02em;
+  color: #fff; margin-bottom: 6px;
+  transition: color 0.3s; position: relative;
+}
+.timer-main.breathing {
+  animation: breathe 8s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%,100% { text-shadow: 0 0 20px rgba(249,115,22,0.3); transform: scale(1); }
+  25%      { text-shadow: 0 0 60px rgba(249,115,22,0.8); transform: scale(1.02); }
+  50%      { text-shadow: 0 0 80px rgba(249,115,22,0.95); transform: scale(1.04); }
+  75%      { text-shadow: 0 0 40px rgba(249,115,22,0.5); transform: scale(1.01); }
+}
+
+.breathe-msg {
+  font-family: var(--sans); font-size: 15px; font-weight: 600;
+  color: rgba(249,115,22,0.75); letter-spacing: 0.15em; text-transform: uppercase;
+  margin-bottom: 10px; min-height: 24px; transition: opacity 0.5s;
+}
+
+.timer-rep-info {
+  font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,0.35);
+  margin-bottom: 24px; min-height: 18px; text-align: center;
+}
+
+/* total remaining bar */
+.total-bar-wrap { width: 100%; max-width: 460px; margin-bottom: 22px; }
+.total-bar-label {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.25);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+}
+.total-bar-track {
+  width: 100%; height: 4px; background: rgba(255,255,255,0.07); border-radius: 2px;
+}
+.total-bar-fill {
+  height: 100%; background: linear-gradient(90deg, var(--blue), var(--orange));
+  border-radius: 2px; transition: width 0.95s linear;
+}
+
+/* phase strip */
+.phase-strip {
+  display: flex; gap: 3px; width: 100%; max-width: 460px;
+  margin-bottom: 32px; height: 5px; border-radius: 3px; overflow: hidden;
+}
+.ps-seg { flex: 1; border-radius: 1px; opacity: 0.35; transition: opacity 0.3s; }
+.ps-seg.active { opacity: 1; }
+.ps-seg.done   { opacity: 0.15; }
+
+/* ── BIG CONTROL BAR ── */
+.timer-controls {
+  display: flex; gap: 0; border-radius: 6px; overflow: hidden;
+  border: 1px solid var(--border2); width: 100%; max-width: 460px;
+  box-shadow: 0 0 40px rgba(0,0,0,0.5);
+}
+
+.btn-ctrl {
+  flex: 1; font-family: var(--display); font-size: 1.2rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 18px 0; border: none; cursor: pointer;
+  transition: all 0.15s; display: flex; align-items: center;
+  justify-content: center; gap: 8px; position: relative;
+}
+.btn-ctrl:not(:last-child) { border-right: 1px solid var(--border2); }
+
+.btn-ctrl-start {
+  background: linear-gradient(135deg, #15803d, #16a34a);
+  color: #fff; flex: 1.6;
+}
+.btn-ctrl-start:hover { background: linear-gradient(135deg, #166534, #15803d); }
+.btn-ctrl-start:active { transform: scale(0.98); }
+
+.btn-ctrl-pause {
+  background: #141414; color: var(--blue-light);
+}
+.btn-ctrl-pause:hover { background: rgba(37,99,235,0.15); }
+.btn-ctrl-pause:active { transform: scale(0.98); }
+.btn-ctrl-pause:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.btn-ctrl-stop {
+  background: #141414; color: var(--red-light);
+}
+.btn-ctrl-stop:hover { background: rgba(220,38,38,0.15); }
+.btn-ctrl-stop:active { transform: scale(0.98); }
+.btn-ctrl-stop:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.btn-icon { font-size: 1.4rem; line-height: 1; }
+
+/* beep log */
+.pg-log {
+  background: #080808; border-top: 1px solid var(--border);
+  padding: 10px 20px; max-height: 140px; overflow-y: auto;
+  font-family: var(--mono); font-size: 10px; color: var(--muted2);
+}
+.log-entry { padding: 3px 0; border-bottom: 1px solid #141414; display: flex; gap: 10px; align-items: baseline; }
+.log-entry:last-child { border-bottom: none; }
+.log-time  { color: var(--muted); flex-shrink: 0; }
+.log-beep  { color: var(--orange-light); }
+.log-event { color: var(--blue-light); }
+.log-done  { color: var(--green-light); }
+.log-pause { color: #a78bfa; }
+.log-cool  { color: #fb923c; }
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<div class="progress-bar" id="progressBar"></div>
+<nav class="toc" id="toc"></nav>
+
+<div class="container">
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="eyebrow">
+    <span class="badge b-orange">Spec v4</span>
+    <span class="badge b-blue">Laravel 13 · PHP 8.5</span>
+    <span class="badge b-green">NativePHP Mobile v3.1</span>
+    <span class="badge b-grey">Android Only · April 2026</span>
+  </div>
+  <h1>
+    <span class="w-blue">Interval</span><br>
+    <span class="w-orange">Timer</span><br>
+    <span class="w-dim">App</span>
+  </h1>
+  <p class="header-sub">Native Android interval timer — Laravel 13 + PHP 8.5 + NativePHP Mobile v3.1. Fully offline, JSON storage, up to 10 phases × 50 reps with pause, cooldown, and configurable beep/TTS countdowns. Includes a live JS playground to validate timer logic.</p>
+  <div class="meta-row">
+    <div class="meta-cell"><span class="mc-label">Framework</span><span class="mc-val blue">Laravel 13</span></div>
+    <div class="meta-cell"><span class="mc-label">PHP</span><span class="mc-val green">8.5 (embedded)</span></div>
+    <div class="meta-cell"><span class="mc-label">NativePHP</span><span class="mc-val orange">Mobile v3.1</span></div>
+    <div class="meta-cell"><span class="mc-label">Storage</span><span class="mc-val">JSON files</span></div>
+    <div class="meta-cell"><span class="mc-label">Platform</span><span class="mc-val orange">Android only</span></div>
+    <div class="meta-cell"><span class="mc-label">Min SDK</span><span class="mc-val">Android 8 (API 26)</span></div>
+  </div>
+</header>
+
+
+<!-- ══ 01 OVERVIEW ══ -->
+<div class="section" data-section="Overview">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">01</span><h2>Project Overview</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="card">
+      <div class="card-title">Purpose</div>
+      <p>A demo app showcasing NativePHP Mobile v3.1 — a native, fully offline interval timer running on real Laravel 13 with PHP 8.5, no web server. Users build multi-phase repeatable timers with per-phase pauses and cooldowns, configurable audio countdowns, and a live total duration display.</p>
+    </div>
+    <div class="card">
+      <div class="card-title orange">Key Terminology (canonical)</div>
+      <ul>
+        <li><strong>Program</strong> — named collection of up to 10 phases + per-program settings</li>
+        <li><strong>Phase</strong> — a named timed block with repetitions, a pause between reps, and a cooldown after the final rep</li>
+        <li><strong>Repetition</strong> — one execution of the phase duration (max 50 per phase)</li>
+        <li><strong>Pause</strong> — dead-time between repetitions within the same phase (not a separate phase)</li>
+        <li><strong>Cooldown</strong> — dead-time after the last repetition of a phase, before the next phase begins. Editable on every phase including the last, but <strong>the last phase's cooldown is never executed and never counted</strong> — a program always ends on the final rep of the final phase</li>
+        <li><strong>Beep Lead-in</strong> — per-program (3s or 5s). Seeded from global default on program creation</li>
+        <li><strong>Total Duration</strong> — live-computed: all reps + all pauses + cooldowns of non-last phases only. Last phase cooldown excluded always</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Phase execution sequence — 3 phases, 2 reps each</div>
+      <p style="font-family:var(--mono); font-size:11px; color:#666; line-height:2.4;">
+        <span style="color:var(--muted2)">Phase 1:</span> <span style="color:var(--blue-light)">[REP 1]</span> → <span style="color:#a78bfa">[PAUSE]</span> → <span style="color:var(--blue-light)">[REP 2]</span> → <span style="color:var(--orange-light)">[COOLDOWN]</span><br>
+        <span style="color:var(--muted2)">Phase 2:</span> <span style="color:var(--blue-light)">[REP 1]</span> → <span style="color:#a78bfa">[PAUSE]</span> → <span style="color:var(--blue-light)">[REP 2]</span> → <span style="color:var(--orange-light)">[COOLDOWN]</span><br>
+        <span style="color:var(--muted2)">Phase 3:</span> <span style="color:var(--blue-light)">[REP 1]</span> → <span style="color:#a78bfa">[PAUSE]</span> → <span style="color:var(--blue-light)">[REP 2]</span> → <span style="color:#333;text-decoration:line-through">[COOLDOWN — skipped]</span><br>
+        <span style="color:var(--green-light)">END</span>
+      </p>
+      <p style="margin-top:10px;"><strong>Iron rule: a program always ends on the final rep of the final phase.</strong> No cooldown, no pause, nothing after it. The last phase's cooldown field is editable (it becomes active if a new phase is added after), but is never executed or counted.</p>
+      <p style="margin-top:8px;">Pause field is hidden when a phase has only 1 repetition — there is nothing to pause between.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ 02 TECH STACK ══ -->
+<div class="section" data-section="Tech Stack">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">02</span><h2>Technology Stack</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="callout green"><strong>Updated from v3:</strong> Laravel 13 (released March 17, 2026), PHP 8.5 (stable since Nov 2025), NativePHP Mobile v3.1 (now supports PHP 8.3–8.5, persistent runtime, Android 8+ / API 26+).</div>
+    <div class="stack">
+      <div class="stack-row"><span class="s-layer">Runtime</span><span class="s-name">NativePHP Mobile v3.1</span><span class="s-why">PHP 8.5 embedded in Kotlin shell. Persistent runtime: Laravel boots once, ~5–30ms per request. Auto-detects PHP version from composer.json.</span><span class="s-tag t-new">v3.1</span></div>
+      <div class="stack-row"><span class="s-layer">Framework</span><span class="s-name">Laravel 13</span><span class="s-why">PHP attributes on models (#[Table], #[Fillable]), controllers (#[Middleware], #[Authorize]), jobs (#[Tries], #[Timeout]). Typed config retrieval. Zero breaking changes from L12.</span><span class="s-tag t-new">NEW</span></div>
+      <div class="stack-row"><span class="s-layer">Language</span><span class="s-name">PHP 8.5</span><span class="s-why">Pipe operator |> for clean functional chains in TimerProgram. clone with for immutable cursor updates. Fatal error backtraces. array_first/last_value() helpers.</span><span class="s-tag t-new">NEW</span></div>
+      <div class="stack-row"><span class="s-layer">Storage</span><span class="s-name">Laravel Storage (JSON)</span><span class="s-why">One JSON file per program + settings.json. No SQLite, no migrations. NativePHP handles the on-device path.</span><span class="s-tag t-orange">STORAGE</span></div>
+      <div class="stack-row"><span class="s-layer">UI / Web</span><span class="s-name">Livewire v3 + Alpine.js</span><span class="s-why">Reactive Blade UI in the WebView. wire:poll.1000ms for timer state. Alpine drives 100ms visual tick locally for smooth countdown.</span><span class="s-tag t-blue">UI</span></div>
+      <div class="stack-row"><span class="s-layer">UI / Native</span><span class="s-name">EDGE Components</span><span class="s-why">Native Top Bar + Bottom Navigation (Library / Timer / Settings) outside the WebView lifecycle.</span><span class="s-tag t-orange">NATIVE</span></div>
+      <div class="stack-row"><span class="s-layer">Styling</span><span class="s-name">Tailwind CSS v4</span><span class="s-why">Touch-optimised mobile UI. Dark theme. Phase color backgrounds in active timer.</span><span class="s-tag t-blue">UI</span></div>
+      <div class="stack-row"><span class="s-layer">Timer</span><span class="s-name">TimerRunner Service</span><span class="s-why">Laravel 13 singleton. State machine: idle→running→pause→cooldown→completed. Execution cursor with phase_index, rep_index, total_remaining.</span><span class="s-tag t-blue">CORE</span></div>
+      <div class="stack-row"><span class="s-layer">Audio</span><span class="s-name">Web Audio API + Android TTS</span><span class="s-why">Global setting: beep mode (bundled mp3) or voice mode (Android TTS, feminine voice, calm pitch). Countdown fires on rep, pause, and cooldown ends.</span><span class="s-tag t-orange">AUDIO</span></div>
+      <div class="stack-row"><span class="s-layer">Background</span><span class="s-name">Android Foreground Service</span><span class="s-why">Timer keeps running when app is backgrounded. Notification shows current phase + remaining time. Auto-pause on incoming call via PhoneStateListener.</span><span class="s-tag t-orange">NATIVE</span></div>
+      <div class="stack-row"><span class="s-layer">Queues</span><span class="s-name">NativePHP Queue Worker</span><span class="s-why">v3.1 ZTS PHP enables background queue workers. Used for session history writes and deferred notifications.</span><span class="s-tag t-new">v3.1</span></div>
+      <div class="stack-row"><span class="s-layer">Testing</span><span class="s-name">Pest PHP</span><span class="s-why">First-class requirement. Fake clock for TimerRunner. Temp storage for JSON I/O. Every feature ships with tests.</span><span class="s-tag t-grey">DEV</span></div>
+    </div>
+
+    <div class="card" style="margin-top:10px;">
+      <div class="card-title green">PHP 8.5 Features Used in This Project</div>
+      <ul>
+        <li><strong>Pipe operator <code>|&gt;</code></strong> — <code>TimerProgram::load()</code> chains: read file |&gt; json_decode |&gt; validate |&gt; hydrate</li>
+        <li><strong><code>clone with</code></strong> — TimerRunner cursor advances immutably: <code>$cursor = clone($cursor, ['rep_index' => $cursor->rep_index + 1])</code></li>
+        <li><strong><code>array_first_value()</code> / <code>array_last_value()</code></strong> — cleaner phase/rep boundary checks</li>
+        <li><strong>Fatal error backtraces</strong> — easier debugging during NativePHP development on-device</li>
+        <li><strong><code>#[\NoDiscard]</code> attribute</strong> — mark <code>totalDuration()</code> return as non-discardable for safety</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-title green">Laravel 13 Features Used in This Project</div>
+      <ul>
+        <li><strong><code>#[Middleware]</code> on controllers</strong> — declarative middleware on Livewire-adjacent controllers</li>
+        <li><strong>Typed config retrieval</strong> — <code>config()->string('nativephp.app_id')</code> with type safety at boot</li>
+        <li><strong>Queue::route()</strong> — centrally route history-write jobs to the background worker</li>
+        <li><strong>PHP attributes on events</strong> — <code>PhaseChanged</code> and <code>ProgramCompleted</code> events use attribute-based configuration</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ 03 FUNCTIONALITY ══ -->
+<div class="section" data-section="Functionality">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">03</span><h2>Core Functionality</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="card">
+      <div class="card-title">Phases — up to 10, each with up to 50 reps</div>
+      <ul>
+        <li><strong>Label</strong> — free text ("Sprint", "Rest", "Hold")</li>
+        <li><strong>Duration</strong> — seconds per repetition (mm:ss picker)</li>
+        <li><strong>Repetitions</strong> — 1–50. At 50, the stepper is disabled</li>
+        <li><strong>Pause</strong> — seconds between reps. <strong>Hidden when reps = 1</strong> (nothing to pause between). Has beep countdown at the end</li>
+        <li><strong>Cooldown</strong> — seconds after final rep. Always visible on every phase. On the last phase: field is editable but greyed with tooltip "not counted — add another phase". Has breathing animation + "Take deep breaths". Has beep countdown at the end. <strong>Never executed or counted when it's the last phase.</strong></li>
+        <li><strong>Color</strong> — preset palette. Fills the active timer background during reps</li>
+        <li>Drag-to-reorder. At 10 phases the Add button is disabled showing <code>10/10</code></li>
+      </ul>
+    </div>
+    <hr class="divider">
+    <div class="card">
+      <div class="card-title orange">Beep / Voice Countdown</div>
+      <ul>
+        <li><strong>Global sound mode</strong> — Beep (bundled mp3) or Voice (Android TTS, feminine, calm)</li>
+        <li><strong>Per-program lead-in</strong> — 3s or 5s. Seeded from global default. User overrides per program</li>
+        <li>Countdown fires at end of: <strong>every rep, every pause, every cooldown</strong></li>
+        <li>If phase/pause/cooldown duration &lt; lead-in → countdown starts from second 1</li>
+        <li>Voice says: <em>"five… four… three… two… one"</em> (or from three). Android TTS API, no pre-recorded files</li>
+      </ul>
+    </div>
+    <hr class="divider">
+    <div class="card">
+      <div class="card-title orange">End-of-Program Sound</div>
+      <ul>
+        <li><strong>Triple beep</strong> — three rapid beeps 150ms apart (<code>finish-triple.mp3</code>)</li>
+        <li><strong>Chime</strong> — tonal completion sound (<code>finish-chime.mp3</code>)</li>
+        <li>Chosen per-program, seeded from global default</li>
+      </ul>
+    </div>
+    <hr class="divider">
+    <div class="card">
+      <div class="card-title">Cooldown — Breathing Animation</div>
+      <ul>
+        <li>Cooldown state shows a large timer with a slow pulsing glow (8s cycle: 4s inhale, 4s exhale)</li>
+        <li>"Take deep breaths" message displayed beneath the timer</li>
+        <li>Phase background switches to a neutral dark tone during cooldown</li>
+        <li>Future hook: WearOS heart rate data drives animation cadence in Phase 4</li>
+      </ul>
+    </div>
+    <hr class="divider">
+    <div class="card">
+      <div class="card-title">App Lifecycle Behaviour</div>
+      <ul>
+        <li><strong>Phone call received</strong> — auto-pause (PhoneStateListener). Auto-resume when call ends. Single "paused" beep fires</li>
+        <li><strong>App backgrounded</strong> — timer keeps running via Android Foreground Service. Notification shows phase + time</li>
+        <li><strong>App killed</strong> — state discarded silently. No history entry written. History only records fully completed programs</li>
+      </ul>
+    </div>
+    <hr class="divider">
+    <div class="card">
+      <div class="card-title">Total Duration — always visible</div>
+      <p>Formula: for every phase <strong>except the last</strong>: <code>(duration × reps) + (pause × (reps−1)) + cooldown</code>. For the <strong>last phase</strong>: <code>(duration × reps) + (pause × (reps−1))</code> — cooldown excluded. Shown live in the editor, on each library card, and as a secondary "total remaining" countdown in the active timer.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ 04 DATA STORAGE ══ -->
+<div class="section" data-section="Storage">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">04</span><h2>Data Storage</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="callout"><strong>No SQLite. No migrations.</strong> JSON files via Laravel Storage. NativePHP manages the on-device path automatically.</div>
+    <div class="card">
+      <div class="card-title">Program JSON</div>
+      <div class="json-block">{
+  <span class="jv-key">"id"</span>:             <span class="jv-str">"01jkx82n"</span>,
+  <span class="jv-key">"name"</span>:           <span class="jv-str">"HIIT Sprint"</span>,
+  <span class="jv-key">"created_at"</span>:     <span class="jv-str">"2026-04-06T09:12:00Z"</span>,
+  <span class="jv-key">"last_used_at"</span>:   <span class="jv-str">"2026-04-06T17:44:00Z"</span>,
+  <span class="jv-key">"beep_lead_in"</span>:   <span class="jv-num">3</span>,       <span class="jv-c">// per-program: 3 or 5</span>
+  <span class="jv-key">"end_sound"</span>:      <span class="jv-str">"triple"</span>, <span class="jv-c">// "triple" | "chime"</span>
+  <span class="jv-key">"total_duration"</span>: <span class="jv-num">870</span>,     <span class="jv-c">// computed on save</span>
+  <span class="jv-key">"phases"</span>: [
+    {
+      <span class="jv-key">"label"</span>:        <span class="jv-str">"Warmup"</span>,
+      <span class="jv-key">"duration"</span>:     <span class="jv-num">120</span>,
+      <span class="jv-key">"repetitions"</span>:  <span class="jv-num">1</span>,
+      <span class="jv-key">"pause"</span>:        <span class="jv-num">0</span>,
+      <span class="jv-key">"cooldown"</span>:     <span class="jv-num">0</span>,
+      <span class="jv-key">"color"</span>:        <span class="jv-str">"#3b82f6"</span>
+    },
+    {
+      <span class="jv-key">"label"</span>:        <span class="jv-str">"Sprint"</span>,
+      <span class="jv-key">"duration"</span>:     <span class="jv-num">30</span>,
+      <span class="jv-key">"repetitions"</span>:  <span class="jv-num">6</span>,
+      <span class="jv-key">"pause"</span>:        <span class="jv-num">10</span>,   <span class="jv-c">// between each of 6 reps</span>
+      <span class="jv-key">"cooldown"</span>:     <span class="jv-num">60</span>,   <span class="jv-c">// after 6th rep</span>
+      <span class="jv-key">"color"</span>:        <span class="jv-str">"#ef4444"</span>
+    }
+  ]
+}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Settings JSON</div>
+      <div class="json-block">{
+  <span class="jv-key">"default_beep_lead_in"</span>: <span class="jv-num">3</span>,        <span class="jv-c">// seeds new programs only</span>
+  <span class="jv-key">"default_end_sound"</span>:    <span class="jv-str">"triple"</span>,
+  <span class="jv-key">"sound_mode"</span>:           <span class="jv-str">"beep"</span>,    <span class="jv-c">// "beep" | "voice"</span>
+  <span class="jv-key">"volume"</span>:               <span class="jv-num">0.8</span>,
+  <span class="jv-key">"keep_screen_on"</span>:       <span class="jv-bool">true</span>
+}</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ 05 PLAYGROUND ══ -->
+<div class="section" data-section="Playground">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">05</span><h2>Live Timer Playground</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="callout blue"><strong>Validate the logic here.</strong> Build a program with the phase editor below, then run it. Beeps play via Web Audio API. Voice countdown uses the browser's Speech Synthesis. This is exactly how the mobile app will behave.</div>
+
+    <div class="playground">
+
+      <!-- Builder -->
+      <div class="pg-builder">
+        <div class="pg-title">▸ Program Builder</div>
+
+        <div class="pg-col-labels">
+          <div class="pg-col-label">Label</div>
+          <div class="pg-col-label">Duration</div>
+          <div class="pg-col-label">Reps</div>
+          <div class="pg-col-label">Pause (s)</div>
+          <div class="pg-col-label">Cooldown (s)</div>
+          <div class="pg-col-label">Color</div>
+          <div class="pg-col-label"></div>
+        </div>
+
+        <div class="pg-phases" id="pgPhases"></div>
+
+        <div class="pg-controls-row">
+          <button class="btn-add-phase" id="btnAddPhase" onclick="addPhase()">＋ Add Phase</button>
+          <div class="pg-setting">
+            <span>Lead-in</span>
+            <select id="pgLeadIn">
+              <option value="3">3 seconds</option>
+              <option value="5">5 seconds</option>
+            </select>
+          </div>
+          <div class="pg-setting">
+            <span>Sound</span>
+            <select id="pgSoundMode">
+              <option value="beep">Beep</option>
+              <option value="voice">Voice (TTS)</option>
+            </select>
+          </div>
+          <div class="pg-setting">
+            <span>End</span>
+            <select id="pgEndSound">
+              <option value="triple">Triple beep</option>
+              <option value="chime">Chime</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pg-summary" id="pgSummary">
+          <div class="pg-sum-item"><span class="pg-sum-label">Phases</span><span class="pg-sum-val blue" id="sumPhases">0</span></div>
+          <div class="pg-sum-item"><span class="pg-sum-label">Total Reps</span><span class="pg-sum-val blue" id="sumReps">0</span></div>
+          <div class="pg-sum-item"><span class="pg-sum-label">Total Duration</span><span class="pg-sum-val" id="sumDuration">0:00</span></div>
+          <div class="pg-sum-item"><span class="pg-sum-label">Active Time</span><span class="pg-sum-val blue" id="sumActive">0:00</span></div>
+          <div class="pg-sum-item"><span class="pg-sum-label">Pause+Cooldown</span><span class="pg-sum-val" id="sumRest">0:00</span></div>
+        </div>
+      </div>
+
+      <!-- Timer display -->
+      <div class="pg-timer" id="pgTimer">
+        <div class="timer-phase-label" id="timerPhaseLabel">BUILD YOUR PROGRAM ABOVE</div>
+        <div class="timer-state-badge sb-idle" id="timerStateBadge">IDLE</div>
+        <div class="timer-main" id="timerMain">0:00</div>
+        <div class="breathe-msg" id="breatheMsg" style="opacity:0">Take deep breaths</div>
+        <div class="timer-rep-info" id="timerRepInfo"></div>
+        <div class="total-bar-wrap">
+          <div class="total-bar-label">
+            <span>Total remaining</span>
+            <span id="totalRemLabel">—</span>
+          </div>
+          <div class="total-bar-track">
+            <div class="total-bar-fill" id="totalBarFill" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="phase-strip" id="phaseStrip"></div>
+
+        <!-- Big control bar -->
+        <div class="timer-controls">
+          <button class="btn-ctrl btn-ctrl-start" id="btnStart" onclick="timerStart()">
+            <span class="btn-icon">▶</span> Start
+          </button>
+          <button class="btn-ctrl btn-ctrl-pause" id="btnPause" onclick="timerPause()" disabled>
+            <span class="btn-icon">⏸</span> Pause
+          </button>
+          <button class="btn-ctrl btn-ctrl-stop" id="btnStop" onclick="timerStop()" disabled>
+            <span class="btn-icon">■</span> Stop
+          </button>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="pg-log" id="pgLog">
+        <div class="log-entry"><span class="log-time">--:--</span><span style="color:var(--muted2)">Playground ready. Build phases above and press START.</span></div>
+      </div>
+
+    </div><!-- /playground -->
+  </div>
+</div>
+
+
+<!-- ══ 06 ARCHITECTURE ══ -->
+<div class="section" data-section="Architecture">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">06</span><h2>Architecture</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="card">
+      <div class="card-title">TimerRunner State Machine</div>
+      <div class="json-block">idle
+  → running       <span class="jk">// executing a repetition</span>
+    → paused      <span class="jk">// user hit pause (or phone call)</span>
+    → pause       <span class="jk">// dead-time between reps</span>
+    → cooldown    <span class="jk">// dead-time after final rep, breathing animation</span>
+  → completed     <span class="jk">// all phases done, end sound fires</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Execution Cursor (PHP 8.5 readonly class)</div>
+      <div class="json-block">readonly class TimerCursor {
+    public function __construct(
+        public int    $phaseIndex,
+        public int    $repIndex,
+        public string $state,        <span class="jk">// running|pause|cooldown|paused</span>
+        public int    $remaining,    <span class="jk">// seconds left in current segment</span>
+        public int    $totalRemaining
+    ) {}
+
+    <span class="jk">// PHP 8.5 clone with — immutable advance</span>
+    public function nextRep(): self {
+        return clone($this, ['repIndex' => $this->repIndex + 1, 'state' => 'running']);
+    }
+}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">PHP 8.5 Pipe operator in TimerProgram</div>
+      <div class="json-block">public static function load(string $id): self
+{
+    return Storage::get("programs/{$id}.json")
+        |> json_decode(...)
+        |> fn($d) => self::validate($d)
+        |> fn($d) => self::hydrate($d);
+}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Key Files</div>
+      <div class="json-block">app/Services/TimerRunner.php         <span class="jk">← singleton, state machine, beep scheduling</span>
+app/Models/TimerCursor.php           <span class="jk">← PHP 8.5 readonly class, clone with</span>
+app/Models/TimerProgram.php          <span class="jk">← JSON ↔ PHP, pipe operator load/save</span>
+app/Livewire/Library.php             <span class="jk">← sorted by last_used_at</span>
+app/Livewire/ProgramEditor.php       <span class="jk">← phase CRUD, 10-phase / 50-rep caps</span>
+app/Livewire/ActiveTimer.php         <span class="jk">← wire:poll + Alpine tick + beep events</span>
+app/Livewire/Settings.php
+app/Events/PhaseChanged.php          <span class="jk">← #[Broadcast] attribute (L13)</span>
+app/Events/ProgramCompleted.php
+app/Listeners/NotifyPhaseChange.php
+resources/views/layouts/app.blade.php   <span class="jk">← EDGE Bottom Nav + Top Bar</span>
+resources/audio/{beep,finish-triple,finish-chime}.mp3
+storage/app/programs/*.json
+storage/app/settings.json
+tests/Feature/{TimerRunnerTest,BeepLogicTest,DurationCalcTest,...}.php</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ 07 FEATURES ══ -->
+<div class="section" data-section="Features">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">07</span><h2>Feature Set</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="feature-grid">
+      <div class="feat"><div class="feat-icon">⏱</div><div class="feat-name">Multi-Phase Timer</div><div class="feat-desc">Up to 10 phases, each with up to 50 reps, pause between reps, and cooldown after final rep.</div><div class="feat-foot"><span class="p-mvp">MVP</span></div></div>
+      <div class="feat"><div class="feat-icon">🔁</div><div class="feat-name">Repeatable Phases</div><div class="feat-desc">Each phase runs 1–50 times. Pause fires between reps. Cooldown fires after the last rep.</div><div class="feat-foot"><span class="p-mvp">MVP</span></div></div>
+      <div class="feat"><div class="feat-icon">📚</div><div class="feat-name">Timer Library</div><div class="feat-desc">Saved programs sorted by last_used_at. Shows total duration + phase count on each card.</div><div class="feat-foot"><span class="p-mvp">MVP</span></div></div>
+      <div class="feat"><div class="feat-icon">🔊</div><div class="feat-name">Beep / TTS Countdown</div><div class="feat-desc">Global: beep (mp3) or feminine TTS voice counting down. Fires on rep, pause, and cooldown ends.</div><div class="feat-foot"><span class="p-mvp">MVP</span></div></div>
+      <div class="feat"><div class="feat-icon">🌬</div><div class="feat-name">Breathing Cooldown</div><div class="feat-desc">8s pulse glow + "Take deep breaths" during cooldown. WearOS sync hook in Phase 4.</div><div class="feat-foot"><span class="p-mvp">MVP</span></div></div>
+      <div class="feat"><div class="feat-icon">🧭</div><div class="feat-name">EDGE Navigation</div><div class="feat-desc">Native Bottom Nav (Library / Timer / Settings) + Top Bar. True native Android feel.</div><div class="feat-foot"><span class="p-mvp">MVP</span></div></div>
+      <div class="feat"><div class="feat-icon">📊</div><div class="feat-name">Total Duration</div><div class="feat-desc">Live-computed in editor. Shown on library card. Secondary countdown in active timer.</div><div class="feat-foot"><span class="p-mvp">MVP</span></div></div>
+      <div class="feat"><div class="feat-icon">📱</div><div class="feat-name">Lifecycle Handling</div><div class="feat-desc">Auto-pause on call, resume after. Background foreground service with notification. Kill = discard.</div><div class="feat-foot"><span class="p-mvp">MVP</span></div></div>
+      <div class="feat"><div class="feat-icon">🔔</div><div class="feat-name">OS Notifications</div><div class="feat-desc">Phase change notification when backgrounded. NativePHP System plugin.</div><div class="feat-foot"><span class="p-v11">v1.1</span></div></div>
+      <div class="feat"><div class="feat-icon">📤</div><div class="feat-name">Share Timer</div><div class="feat-desc">Export program JSON via Android Share sheet. Import from a file.</div><div class="feat-foot"><span class="p-v11">v1.1</span></div></div>
+      <div class="feat"><div class="feat-icon">⌚</div><div class="feat-name">Samsung Watch</div><div class="feat-desc">Separate WearOS Kotlin companion. Phase display + haptics + start/pause/stop from wrist.</div><div class="feat-foot"><span class="p-watch">PHASE 4</span></div></div>
+      <div class="feat"><div class="feat-icon">💓</div><div class="feat-name">Watch Breathing Sync</div><div class="feat-desc">WearOS heart rate / breathing data drives cooldown animation cadence.</div><div class="feat-foot"><span class="p-watch">PHASE 4</span></div></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ 08 TESTING ══ -->
+<div class="section" data-section="Testing">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">08</span><h2>Testing</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="callout green"><strong>Testing is not optional.</strong> Every core behaviour has a Pest test. Code without a test is not done.</div>
+    <div class="test-table">
+      <div class="test-row hdr"><div class="tc">Suite</div><div class="tc">Test Cases</div><div class="tc">Priority</div></div>
+      <div class="test-row"><div class="tc ts">TimerRunnerTest</div><div class="tc tcase">State transitions idle→running→pause→cooldown→completed · user pause preserves cursor · total_remaining decrements · 10-phase limit enforced</div><div class="tc"><span class="tp-crit">CRITICAL</span></div></div>
+      <div class="test-row"><div class="tc ts">BeepLogicTest</div><div class="tc tcase">Lead-in 3s: fires t-3,2,1,0 · Lead-in 5s: fires t-5..0 · Duration 2s + lead-in 5s → beeps from t-2 · Fires on rep end, pause end, cooldown end · No double-fire</div><div class="tc"><span class="tp-crit">CRITICAL</span></div></div>
+      <div class="test-row"><div class="tc ts">DurationCalcTest</div><div class="tc tcase">Single phase 1 rep · Multi-rep with pause · Cooldown on last phase counted · All 10 phases varied reps · formattedDuration() mm:ss and h:mm:ss</div><div class="tc"><span class="tp-crit">CRITICAL</span></div></div>
+      <div class="test-row"><div class="tc ts">CursorTest</div><div class="tc tcase">Advances through reps · Skips pause when pause=0 · Skips cooldown when cooldown=0 · Last phase last rep → completed · clone with immutability</div><div class="tc"><span class="tp-crit">CRITICAL</span></div></div>
+      <div class="test-row"><div class="tc ts">TimerProgramTest</div><div class="tc tcase">Saves/loads JSON · last_used_at updated on run · totalDuration() formula · 50-rep cap enforced · Pipe operator load chain</div><div class="tc"><span class="tp-high">HIGH</span></div></div>
+      <div class="test-row"><div class="tc ts">SettingsTest</div><div class="tc tcase">Defaults when settings.json missing · New program seeded with global defaults · Per-program beep_lead_in overrides global · volume clamped 0–1</div><div class="tc"><span class="tp-high">HIGH</span></div></div>
+      <div class="test-row"><div class="tc ts">EndSoundTest</div><div class="tc tcase">ProgramCompleted fires exactly once · Triple vs chime selected correctly · Not fired on mid-program phase change</div><div class="tc"><span class="tp-high">HIGH</span></div></div>
+      <div class="test-row"><div class="tc ts">LifecycleTest</div><div class="tc tcase">Pause state preserved on phone call · Resume restores exact cursor position · Kill discards state, no history entry · Background: state still ticking</div><div class="tc"><span class="tp-high">HIGH</span></div></div>
+    </div>
+    <div class="card" style="margin-top:10px;">
+      <div class="card-title">Conventions</div>
+      <ul>
+        <li>Pest PHP throughout — <code>describe()</code> blocks per class</li>
+        <li>TimerRunner uses a <strong>fake clock</strong> — inject tick count, no real time.sleep()</li>
+        <li>TimerProgram writes to a <strong>temp directory</strong>, never real storage</li>
+        <li>Run with <code>php artisan test --parallel</code> on every build</li>
+        <li>Every PR must include tests before merge</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ 09 ROADMAP ══ -->
+<div class="section" data-section="Roadmap">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">09</span><h2>Roadmap</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="phase"><div class="ph-dot ph1">P1</div><div><div class="ph-title">MVP — Core Timer</div><div class="ph-items">Laravel 13 + PHP 8.5 + NativePHP Mobile v3.1 scaffold · JSON storage layer · TimerProgram (pipe operator load/save) · TimerCursor (readonly + clone with) · TimerRunner state machine · Phase editor (10 phases, 50 reps, pause, cooldown) · Active timer: phase color bg, breathing cooldown, rep/phase counter · Beep (Web Audio) + Voice (Android TTS) countdown · End sounds · EDGE Bottom Nav + Top Bar · Library sorted by last_used_at · Global settings · Total duration live in editor</div></div></div>
+    <div class="phase"><div class="ph-dot ph2">P2</div><div><div class="ph-title">v1.1 — Platform Polish</div><div class="ph-items">Android Foreground Service (background timer) · PhoneStateListener (auto-pause on call) · OS notifications on phase change · Share/import program JSON · Drag-to-reorder phases · Duplicate program · Full Pest test suite · Physical device testing</div></div></div>
+    <div class="phase"><div class="ph-dot ph3">P3</div><div><div class="ph-title">v1.2 — App Store Ready</div><div class="ph-items">App icon + splash screen · Bifrost build pipeline · README + demo video for NativePHP showcase · Performance profiling with persistent runtime</div></div></div>
+    <div class="phase"><div class="ph-dot ph4">W</div><div><div class="ph-title">Phase 4 — WearOS Companion</div><div class="ph-items">Separate Kotlin/Wear Compose project · Wearable Data Layer IPC bridge · Phase display + haptic feedback · Start/pause/stop from watch · Heart rate sync for breathing animation cadence · Complication support</div></div></div>
+  </div>
+</div>
+
+
+<!-- ══ 10 BOOTSTRAP CHECKLIST ══ -->
+<div class="section" data-section="Checklist">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">10</span><h2>Bootstrap Checklist</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="card">
+      <ul class="checklist">
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span><code>laravel new interval-timer</code> — Laravel 13, requires PHP 8.5</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Set <code>"php": "^8.5"</code> in composer.json — NativePHP v3.1 auto-matches bundled runtime</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span><code>composer require nativephp/mobile</code> + <code>php artisan native:install</code></span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Configure app name, bundle ID, <code>compile_sdk</code>, <code>min_sdk</code> (26), <code>target_sdk</code> in <code>config/nativephp.php</code></span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Remove SQLite config entirely — no DB, no migrations</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Install Livewire v3 + Tailwind CSS v4</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Build <code>TimerCursor</code> readonly class with <code>clone with</code> advance methods</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Build <code>TimerProgram</code> with PHP 8.5 pipe operator load/save chain</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Build <code>TimerRunner</code> singleton: state machine + beep scheduling + lifecycle hooks</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Add bundled audio: <code>beep.mp3</code>, <code>finish-triple.mp3</code>, <code>finish-chime.mp3</code></span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Define EDGE Bottom Nav (Library / Timer / Settings) + Top Bar in <code>layouts/app.blade.php</code></span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Build <code>ProgramEditor</code> Livewire: 10-phase cap, 50-rep cap, pause + cooldown fields, live total duration</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Build <code>ActiveTimer</code> Livewire: wire:poll + Alpine 100ms tick + breathing cooldown animation</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Build <code>Library</code> Livewire: sorted by last_used_at, total duration on cards</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Build <code>Settings</code> Livewire: sound mode (beep/voice), lead-in default, end sound, volume</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Wire Android TTS (feminine voice, calm pitch) for voice mode countdown</span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Test on Android emulator: <code>php artisan native:run --os=android</code></span></li>
+        <li onclick="toggleCheck(this)"><div class="ch-box">✓</div><span>Write Pest test suite: TimerRunner, BeepLogic, DurationCalc, Cursor, LifecycleTest</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ 11 CLAUDE CODE HANDOFF ══ -->
+<div class="section" data-section="Claude Code">
+  <div class="section-header" onclick="toggleSection(this)">
+    <span class="sec-num">11</span><h2>Transfer to Claude Code</h2><span class="toggle">▾</span>
+  </div>
+  <div class="section-body">
+    <div class="transfer-box">
+      <h3>→ Claude Code Handoff Prompt</h3>
+      <p style="font-size:13px; color:#666; font-weight:500; margin-bottom:12px;">Run <code>claude</code> in your terminal and paste this:</p>
+      <div class="code-block" id="transferPrompt">You are helping me build a native Android interval timer app using NativePHP Mobile v3.1 + Laravel 13 + PHP 8.5. Demo app showcasing NativePHP. Android only — no iOS.
+
+VERSIONS:
+- Laravel 13 (released March 17 2026, zero breaking changes from L12)
+- PHP 8.5 (stable since Nov 2025, latest 8.5.4)
+- NativePHP Mobile v3.1 (persistent runtime ~5-30ms, PHP 8.3-8.5 support, Android 8+ / API 26+)
+- Livewire v3, Alpine.js, Tailwind CSS v4, Pest PHP
+
+STORAGE: JSON files via Laravel Storage. NO SQLite, NO migrations.
+- storage/app/programs/{id}.json — one file per program
+- storage/app/settings.json — global defaults
+
+PROGRAM JSON SHAPE:
+{ id, name, created_at, last_used_at, beep_lead_in (3|5), end_sound (triple|chime),
+  total_duration (computed int),
+  phases: [{ label, duration, repetitions (1-50), pause (secs between reps),
+             cooldown (secs after final rep), color }] }  // max 10 phases
+
+SETTINGS JSON:
+{ default_beep_lead_in, default_end_sound, sound_mode (beep|voice), volume (0-1), keep_screen_on }
+
+TERMINOLOGY (use exactly in code + UI):
+- Phase: named timed block (max 10)
+- Repetition: one execution of phase duration (max 50)
+- Pause: dead-time between reps (not a separate phase)
+- Cooldown: dead-time after final rep, before next phase (part of phase, executes even on last phase)
+- Beep Lead-in: per-program setting (3 or 5s), seeded from global on creation
+- Total Duration: sum of (duration*reps) + (pause*(reps-1)) + cooldown across all phases
+
+TIMER STATE MACHINE (TimerRunner — Laravel 13 singleton):
+States: idle → running → paused → pause → cooldown → completed
+- PHP 8.5 readonly class TimerCursor: phaseIndex, repIndex, state, remaining, totalRemaining
+- clone with for immutable cursor advancement
+- Beep fires at end of: every rep, every pause, every cooldown
+- If segment duration < lead-in → beep from second 1
+- Paused beep fires on user pause / phone call. Resumes from exact position.
+- completed → fires ProgramCompleted event → plays end sound (triple or chime)
+
+PHP 8.5 FEATURES TO USE:
+- Pipe operator |> in TimerProgram::load() chain
+- clone with in TimerCursor advance methods
+- readonly class for TimerCursor
+- array_first_value() / array_last_value() for phase boundaries
+- #[\NoDiscard] on totalDuration()
+
+LARAVEL 13 FEATURES TO USE:
+- #[Middleware] on controllers
+- Typed config: config()->string(), config()->integer()
+- Queue::route() for background history writes
+- PHP attributes on events (PhaseChanged, ProgramCompleted)
+
+AUDIO:
+- Global sound_mode: "beep" (Web Audio API, bundled mp3) or "voice" (Android TTS, feminine, calm)
+- Countdown fires on rep end, pause end, cooldown end — same lead-in logic
+- End sounds: finish-triple.mp3 (3 beeps 150ms apart) or finish-chime.mp3
+
+COOLDOWN ANIMATION:
+- CSS breathing glow: 8s cycle (4s inhale, 4s exhale), pulse text-shadow on orange
+- "Take deep breaths" text beneath timer
+- Architecture hook: WearOS heart rate data will drive cadence in Phase 4
+
+LIFECYCLE (Android):
+- Phone call → auto-pause (PhoneStateListener) → auto-resume on call end
+- Backgrounded → Android Foreground Service keeps timer running, notification shows phase + time
+- App killed → silent discard, NO history entry (history only on full completion)
+
+NATIVEPHP v3.1 SPECIFICS:
+- Set "php": "^8.5" in composer.json — NativePHP auto-detects and matches bundled runtime
+- config/nativephp.php: set compile_sdk, min_sdk: 26, target_sdk
+- NativePHP Queue Worker (ZTS PHP) available for background jobs
+- EDGE Bottom Nav: Library / Timer / Settings tabs in layouts/app.blade.php
+- EDGE Top Bar: program name when running, app name otherwise
+
+TESTING (Pest PHP — first class, not optional):
+- TimerRunnerTest: state transitions, cursor, 10-phase limit
+- BeepLogicTest: lead-in 3s/5s, short segment fallback, fires on rep/pause/cooldown
+- DurationCalcTest: formula, formatted output, all edge cases
+- CursorTest: advances, clone with immutability, boundary conditions
+- TimerProgramTest: JSON load/save, pipe operator chain, 50-rep cap
+- SettingsTest: defaults, per-program override
+- EndSoundTest: fires once on completion only
+- LifecycleTest: pause/resume/kill behaviour
+- Fake clock for TimerRunner, temp directory for Storage
+
+START WITH:
+1. Laravel 13 + NativePHP Mobile v3.1 scaffold + PHP 8.5 declaration
+2. TimerCursor readonly class with clone with
+3. TimerProgram plain PHP model with pipe operator load/save
+4. TimerRunner singleton with full state machine + beep scheduling
+5. Show me all four files for review before moving to UI
+
+Docs: https://nativephp.com/docs/mobile/3/getting-started/introduction</div>
+      <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">⎘ COPY PROMPT</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ══ BACKGROUND CANVAS ══
+(function() {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  function draw() {
+    resize(); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const count = Math.floor(canvas.width / 36) + 4;
+    const greys = ['#191919','#171717','#151515','#1e1e1e','#1b1b1b','#202020'];
+    for (let i = 0; i < count; i++) {
+      const segs = Math.floor(Math.random() * 4) + 2;
+      const w = Math.random() * 18 + 6;
+      const x = i * (canvas.width / count) + Math.random() * 8;
+      let y = Math.random() * canvas.height * 0.15;
+      for (let s = 0; s < segs; s++) {
+        const h = Math.random() * canvas.height * 0.22 + 16;
+        const gap = Math.random() * 30 + 8;
+        ctx.fillStyle = greys[Math.floor(Math.random() * greys.length)];
+        ctx.fillRect(x, y, w, h);
+        y += h + gap;
+        if (y > canvas.height + 40) break;
+      }
+    }
+  }
+  draw();
+  window.addEventListener('resize', draw);
+})();
+
+// ══ PROGRESS BAR ══
+window.addEventListener('scroll', () => {
+  const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
+  document.getElementById('progressBar').style.width = pct + '%';
+});
+
+// ══ TOC ══
+const sections = document.querySelectorAll('.section');
+const tocEl = document.getElementById('toc');
+sections.forEach(s => {
+  const dot = document.createElement('div');
+  dot.className = 'toc-dot';
+  dot.title = s.dataset.section;
+  dot.onclick = () => s.scrollIntoView({ behavior: 'smooth' });
+  tocEl.appendChild(dot);
+});
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      const idx = Array.from(sections).indexOf(e.target);
+      document.querySelectorAll('.toc-dot').forEach((d,i) => d.classList.toggle('active', i===idx));
+    }
+  });
+}, { threshold: 0.1 });
+sections.forEach(s => obs.observe(s));
+
+// ══ SECTION TOGGLE ══
+function toggleSection(header) {
+  const body = header.nextElementSibling;
+  const icon = header.querySelector('.toggle');
+  const col = body.classList.toggle('collapsed');
+  if (col) {
+    body.style.maxHeight = '0';
+  } else {
+    body.style.maxHeight = 'none'; // allow full expansion first
+    requestAnimationFrame(() => {
+      const h = body.scrollHeight;
+      body.style.maxHeight = '0';
+      requestAnimationFrame(() => { body.style.maxHeight = h + 'px'; });
+    });
+  }
+  icon.style.transform = col ? 'rotate(-90deg)' : '';
+}
+document.querySelectorAll('.section-body').forEach(b => b.style.maxHeight = 'none');
+
+// ══ CHECKLIST ══
+function toggleCheck(li) { li.classList.toggle('done'); }
+
+// ══ COPY ══
+function copyPrompt() {
+  navigator.clipboard.writeText(document.getElementById('transferPrompt').innerText).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ COPIED'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '⎘ COPY PROMPT'; btn.classList.remove('copied'); }, 2500);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// PLAYGROUND ENGINE
+// ══════════════════════════════════════════════════════════
+
+const DEFAULT_PHASES = [
+  { label: 'Warmup',  duration: 10, repetitions: 1, pause: 0,  cooldown: 5,  color: '#3b82f6' },
+  { label: 'Sprint',  duration: 8,  repetitions: 3, pause: 4,  cooldown: 10, color: '#ef4444' },
+  { label: 'Stretch', duration: 8,  repetitions: 1, pause: 0,  cooldown: 0,  color: '#22c55e' },
+];
+
+let pgPhases = JSON.parse(JSON.stringify(DEFAULT_PHASES));
+
+// Audio context
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playBeep(freq = 880, dur = 0.08, vol = 0.5) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+
+function playTripleBeep() {
+  playBeep(1000, 0.1, 0.6);
+  setTimeout(() => playBeep(1000, 0.1, 0.6), 150);
+  setTimeout(() => playBeep(1000, 0.1, 0.6), 300);
+}
+
+function playChime() {
+  try {
+    const ctx = getAudioCtx();
+    [523, 659, 784, 1047].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'triangle';
+      const t = ctx.currentTime + i * 0.18;
+      gain.gain.setValueAtTime(0.4, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.start(t); osc.stop(t + 0.5);
+    });
+  } catch(e) {}
+}
+
+function playPauseBeep() {
+  playBeep(440, 0.15, 0.4);
+}
+
+function speakNumber(n) {
+  const words = ['zero','one','two','three','four','five'];
+  const txt = words[n] || String(n);
+  try {
+    const utt = new SpeechSynthesisUtterance(txt);
+    utt.rate = 0.85; utt.pitch = 1.2; utt.volume = 0.9;
+    // pick feminine voice if available
+    const voices = speechSynthesis.getVoices();
+    const fem = voices.find(v => /female|woman|girl|zira|samantha|karen|moira|fiona/i.test(v.name));
+    if (fem) utt.voice = fem;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utt);
+  } catch(e) {}
+}
+
+// ── Phase builder ──
+function renderPhases() {
+  const container = document.getElementById('pgPhases');
+  container.innerHTML = '';
+  const lastIdx = pgPhases.length - 1;
+  pgPhases.forEach((ph, i) => {
+    const isLast = i === lastIdx;
+    const showPause = ph.repetitions > 1;
+    const row = document.createElement('div');
+    row.className = 'pg-phase-row';
+    row.innerHTML = `
+      <input type="text"   value="${ph.label}"       placeholder="Label"    oninput="updatePhase(${i},'label',this.value)">
+      <input type="number" value="${ph.duration}"    min="1" max="3600"     oninput="updatePhase(${i},'duration',+this.value)" title="Duration (s)">
+      <input type="number" value="${ph.repetitions}" min="1" max="50"       oninput="updatePhase(${i},'repetitions',+this.value);renderPhases();" title="Reps (max 50)">
+      <input type="number" value="${ph.pause}"       min="0" max="300"      oninput="updatePhase(${i},'pause',+this.value)" title="Pause between reps (s)" style="${showPause ? '' : 'visibility:hidden'}">
+      <input type="number" value="${ph.cooldown}"    min="0" max="600"      oninput="updatePhase(${i},'cooldown',+this.value)" title="${isLast ? 'Cooldown (not counted — add another phase after this one)' : 'Cooldown after final rep (s)'}" style="${isLast ? 'opacity:0.35;border-style:dashed' : ''}">
+      <input type="color"  value="${ph.color}"                              oninput="updatePhase(${i},'color',this.value)">
+      <button class="btn-del" onclick="deletePhase(${i})" title="Remove">✕</button>
+    `;
+    container.appendChild(row);
+  });
+  document.getElementById('btnAddPhase').disabled = pgPhases.length >= 10;
+  updateSummary();
+  updatePhaseStrip();
+}
+
+function updatePhase(i, key, val) {
+  pgPhases[i][key] = val;
+  updateSummary();
+  updatePhaseStrip();
+}
+
+function addPhase() {
+  if (pgPhases.length >= 10) return;
+  pgPhases.push({ label: 'Phase ' + (pgPhases.length + 1), duration: 30, repetitions: 1, pause: 0, cooldown: 0, color: '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0') });
+  renderPhases();
+}
+
+function deletePhase(i) {
+  pgPhases.splice(i, 1);
+  renderPhases();
+}
+
+function phaseDuration(ph, isLast) {
+  const reps = Math.max(1, ph.repetitions || 1);
+  const cooldown = isLast ? 0 : (ph.cooldown || 0);
+  return (ph.duration * reps) + (ph.pause * Math.max(0, reps - 1)) + cooldown;
+}
+
+function totalDuration() {
+  const last = pgPhases.length - 1;
+  return pgPhases.reduce((sum, ph, i) => sum + phaseDuration(ph, i === last), 0);
+}
+
+function totalActiveTime() {
+  return pgPhases.reduce((sum, ph) => sum + ph.duration * Math.max(1, ph.repetitions || 1), 0);
+}
+
+function fmt(s) {
+  s = Math.max(0, Math.round(s));
+  if (s >= 3600) return `${Math.floor(s/3600)}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+
+function updateSummary() {
+  const total = totalDuration();
+  const active = totalActiveTime();
+  const rest = total - active;
+  const totalReps = pgPhases.reduce((s, ph) => s + (ph.repetitions || 1), 0);
+  document.getElementById('sumPhases').textContent = pgPhases.length + '/10';
+  document.getElementById('sumReps').textContent = totalReps;
+  document.getElementById('sumDuration').textContent = fmt(total);
+  document.getElementById('sumActive').textContent = fmt(active);
+  document.getElementById('sumRest').textContent = fmt(rest);
+}
+
+function updatePhaseStrip() {
+  const strip = document.getElementById('phaseStrip');
+  strip.innerHTML = '';
+  const last = pgPhases.length - 1;
+  pgPhases.forEach((ph, i) => {
+    const seg = document.createElement('div');
+    seg.className = 'ps-seg' + (timer.phaseIndex === i ? ' active' : (timer.phaseIndex > i ? ' done' : ''));
+    seg.style.background = ph.color;
+    seg.style.flex = phaseDuration(ph, i === last);
+    strip.appendChild(seg);
+  });
+}
+
+// ── Timer engine ──
+const timer = {
+  running: false, paused: false, intervalId: null,
+  phaseIndex: 0, repIndex: 0, state: 'idle',
+  remaining: 0, totalRemaining: 0, totalDuration: 0,
+  programSnapshot: []
+};
+
+function timerStart() {
+  getAudioCtx(); // unlock audio on first user gesture
+  speechSynthesis.getVoices(); // preload voices
+  if (pgPhases.length === 0) { addLog('No phases defined.', 'event'); return; }
+
+  timer.programSnapshot = JSON.parse(JSON.stringify(pgPhases));
+  timer.phaseIndex = 0;
+  timer.repIndex = 0;
+  timer.state = 'running';
+  timer.totalDuration = totalDuration();
+  timer.totalRemaining = timer.totalDuration;
+  timer.paused = false;
+
+  const ph = timer.programSnapshot[0];
+  timer.remaining = ph.duration;
+
+  updatePhaseStrip();
+  addLog(`Program started — ${timer.programSnapshot.length} phases, ${fmt(timer.totalDuration)}`, 'event');
+  setRunningUI();
+  startTick();
+}
+
+function timerPause() {
+  if (timer.state === 'paused') {
+    timer.state = timer._prevState || 'running';
+    timer.paused = false;
+    addLog('Resumed', 'event');
+    document.getElementById('btnPause').innerHTML = '<span class="btn-icon">⏸</span> Pause';
+    startTick();
+  } else {
+    timer._prevState = timer.state;
+    timer.state = 'paused';
+    timer.paused = true;
+    clearInterval(timer.intervalId);
+    playPauseBeep();
+    addLog('Paused', 'pause');
+    document.getElementById('btnPause').innerHTML = '<span class="btn-icon">▶</span> Resume';
+    renderTimerUI();
+  }
+}
+
+function timerStop() {
+  clearInterval(timer.intervalId);
+  timer.state = 'idle'; timer.running = false;
+  addLog('Stopped — no history entry written', 'event');
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStart').style.opacity = '1';
+  document.getElementById('btnPause').disabled = true;
+  document.getElementById('btnPause').textContent = '';
+  document.getElementById('btnPause').innerHTML = '<span class="btn-icon">⏸</span> Pause';
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('pgTimer').style.background = '';
+  document.getElementById('timerMain').classList.remove('breathing');
+  document.getElementById('breatheMsg').style.opacity = 0;
+  document.getElementById('timerPhaseLabel').textContent = 'BUILD YOUR PROGRAM ABOVE';
+  document.getElementById('timerStateBadge').className = 'timer-state-badge sb-idle';
+  document.getElementById('timerStateBadge').textContent = 'IDLE';
+  document.getElementById('timerMain').textContent = '0:00';
+  document.getElementById('timerRepInfo').textContent = '';
+  document.getElementById('totalRemLabel').textContent = '—';
+  document.getElementById('totalBarFill').style.width = '100%';
+  timer.phaseIndex = 0;
+  updatePhaseStrip();
+}
+
+function setRunningUI() {
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStart').style.opacity = '0.35';
+  document.getElementById('btnPause').disabled = false;
+  document.getElementById('btnStop').disabled = false;
+}
+
+function startTick() {
+  clearInterval(timer.intervalId);
+  timer.running = true;
+  timer.intervalId = setInterval(tick, 1000);
+  renderTimerUI();
+}
+
+function tick() {
+  if (timer.state === 'paused') return;
+
+  // Check beep BEFORE decrement (remaining is seconds left at start of this second)
+  checkBeep();
+
+  timer.remaining--;
+  timer.totalRemaining = Math.max(0, timer.totalRemaining - 1);
+
+  if (timer.remaining <= 0) {
+    advance();
+  } else {
+    renderTimerUI();
+  }
+}
+
+function checkBeep() {
+  if (timer.state === 'pause' || timer.state === 'cooldown') return; // handled separately below
+  const lead = parseInt(document.getElementById('pgLeadIn').value);
+  const mode = document.getElementById('pgSoundMode').value;
+  if (timer.remaining <= lead && timer.remaining > 0) {
+    doBeepOrVoice(timer.remaining, mode);
+  }
+}
+
+function checkSegmentBeep(remaining) {
+  const lead = parseInt(document.getElementById('pgLeadIn').value);
+  const mode = document.getElementById('pgSoundMode').value;
+  if (remaining <= lead && remaining > 0) {
+    doBeepOrVoice(remaining, mode);
+  }
+}
+
+function doBeepOrVoice(n, mode) {
+  if (mode === 'voice') {
+    speakNumber(n);
+  } else {
+    const freq = n <= 1 ? 1200 : 880;
+    playBeep(freq, 0.07, 0.5);
+  }
+  addLog(`Beep t-${n}`, 'beep');
+}
+
+function advance() {
+  const phases = timer.programSnapshot;
+  const ph = phases[timer.phaseIndex];
+  const isLastPhase = timer.phaseIndex >= phases.length - 1;
+
+  if (timer.state === 'running') {
+    const isLastRep = timer.repIndex >= (ph.repetitions - 1);
+
+    if (!isLastRep && ph.pause > 0) {
+      // pause between reps
+      timer.state = 'pause';
+      timer.remaining = ph.pause;
+      addLog(`Pause — ${ph.pause}s between reps`, 'pause');
+      renderTimerUI();
+      runSegmentTick('pause', ph.pause, () => {
+        timer.repIndex++;
+        timer.state = 'running';
+        timer.remaining = ph.duration;
+        addLog(`Rep ${timer.repIndex + 1} / ${ph.repetitions} — ${ph.label}`, 'event');
+        renderTimerUI();
+        startTick();
+      });
+      return;
+    } else if (!isLastRep) {
+      // no pause, straight to next rep
+      timer.repIndex++;
+      timer.remaining = ph.duration;
+      addLog(`Rep ${timer.repIndex + 1} / ${ph.repetitions} — ${ph.label}`, 'event');
+      renderTimerUI();
+      return;
+    } else {
+      // last rep done — cooldown only if NOT the last phase
+      if (!isLastPhase && ph.cooldown > 0) {
+        timer.state = 'cooldown';
+        timer.remaining = ph.cooldown;
+        addLog(`Cooldown — ${ph.cooldown}s after ${ph.label}`, 'cool');
+        renderTimerUI();
+        runSegmentTick('cooldown', ph.cooldown, () => {
+          advancePhase();
+        });
+        return;
+      } else {
+        // last phase: skip cooldown entirely, end program
+        advancePhase();
+        return;
+      }
+    }
+  }
+}
+
+function runSegmentTick(segState, duration, onDone) {
+  clearInterval(timer.intervalId);
+  let segRemaining = duration;
+  timer.intervalId = setInterval(() => {
+    if (timer.state === 'paused') return;
+    checkSegmentBeep(segRemaining);
+    segRemaining--;
+    timer.totalRemaining = Math.max(0, timer.totalRemaining - 1);
+    if (segRemaining <= 0) {
+      clearInterval(timer.intervalId);
+      onDone();
+    } else {
+      timer.remaining = segRemaining;
+      renderTimerUI();
+    }
+  }, 1000);
+}
+
+function advancePhase() {
+  const phases = timer.programSnapshot;
+  const nextPhase = timer.phaseIndex + 1;
+  if (nextPhase >= phases.length) {
+    // PROGRAM COMPLETE
+    clearInterval(timer.intervalId);
+    timer.state = 'completed';
+    timer.running = false;
+    const endSound = document.getElementById('pgEndSound').value;
+    if (endSound === 'triple') { playTripleBeep(); }
+    else { playChime(); }
+    addLog('✓ Program completed!', 'done');
+    document.getElementById('timerPhaseLabel').textContent = 'DONE';
+    document.getElementById('timerStateBadge').className = 'timer-state-badge sb-done';
+    document.getElementById('timerStateBadge').textContent = 'COMPLETED';
+    document.getElementById('timerMain').textContent = '0:00';
+    document.getElementById('timerMain').classList.remove('breathing');
+    document.getElementById('breatheMsg').style.opacity = 0;
+    document.getElementById('timerRepInfo').textContent = '';
+    document.getElementById('totalBarFill').style.width = '0%';
+    document.getElementById('totalRemLabel').textContent = '0:00';
+    document.getElementById('pgTimer').style.background = 'rgba(34,197,94,0.08)';
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStart').style.opacity = '1';
+    document.getElementById('btnPause').disabled = true;
+    document.getElementById('btnPause').innerHTML = '<span class="btn-icon">⏸</span> Pause';
+    document.getElementById('btnStop').disabled = true;
+    timer.phaseIndex = 0;
+    updatePhaseStrip();
+    return;
+  }
+
+  timer.phaseIndex = nextPhase;
+  timer.repIndex = 0;
+  timer.state = 'running';
+  const ph = phases[nextPhase];
+  timer.remaining = ph.duration;
+  addLog(`Phase ${nextPhase + 1}: ${ph.label}`, 'event');
+  updatePhaseStrip();
+  renderTimerUI();
+  startTick();
+}
+
+function renderTimerUI() {
+  const phases = timer.programSnapshot;
+  if (!phases || phases.length === 0) return;
+  const ph = phases[timer.phaseIndex] || phases[0];
+  const state = timer.state;
+
+  // background color
+  const timerEl = document.getElementById('pgTimer');
+  if (state === 'running') {
+    const hex = ph.color || '#3b82f6';
+    const r = parseInt(hex.slice(1,3),16);
+    const g = parseInt(hex.slice(3,5),16);
+    const b = parseInt(hex.slice(5,7),16);
+    timerEl.style.background = `rgba(${r},${g},${b},0.18)`;
+  } else if (state === 'pause') {
+    timerEl.style.background = 'rgba(37,99,235,0.08)';
+  } else if (state === 'cooldown') {
+    timerEl.style.background = 'rgba(234,88,12,0.06)';
+  } else if (state === 'paused') {
+    timerEl.style.background = 'rgba(255,255,255,0.03)';
+  }
+
+  // breathing
+  const mainEl = document.getElementById('timerMain');
+  const breatheEl = document.getElementById('breatheMsg');
+  if (state === 'cooldown') {
+    mainEl.classList.add('breathing');
+    breatheEl.style.opacity = '1';
+    breatheEl.textContent = 'Take deep breaths';
+  } else {
+    mainEl.classList.remove('breathing');
+    breatheEl.style.opacity = '0';
+  }
+
+  // phase label
+  const phaseLabel = document.getElementById('timerPhaseLabel');
+  if (state === 'pause')    phaseLabel.textContent = 'REST';
+  else if (state === 'cooldown') phaseLabel.textContent = 'COOLDOWN — ' + ph.label;
+  else if (state === 'paused')   phaseLabel.textContent = '— PAUSED —';
+  else                           phaseLabel.textContent = ph.label || '—';
+
+  // state badge
+  const badge = document.getElementById('timerStateBadge');
+  const badgeMap = { running:'sb-running', pause:'sb-pause', cooldown:'sb-cooldown', paused:'sb-paused', completed:'sb-done', idle:'sb-idle' };
+  badge.className = 'timer-state-badge ' + (badgeMap[state] || 'sb-idle');
+  badge.textContent = state === 'paused' ? '⏸ PAUSED' : state.toUpperCase();
+
+  // countdown
+  mainEl.textContent = fmt(timer.remaining);
+
+  // rep info
+  const repEl = document.getElementById('timerRepInfo');
+  if (state === 'running') {
+    repEl.textContent = `Rep ${timer.repIndex + 1} / ${ph.repetitions}  ·  Phase ${timer.phaseIndex + 1} / ${phases.length}`;
+  } else if (state === 'pause') {
+    repEl.textContent = `Rest between reps — after rep ${timer.repIndex + 1} / ${ph.repetitions}`;
+  } else if (state === 'cooldown') {
+    repEl.textContent = `Cooldown — Phase ${timer.phaseIndex + 1} / ${phases.length}`;
+  } else if (state === 'paused') {
+    repEl.textContent = `Rep ${timer.repIndex + 1} / ${ph.repetitions}  ·  Phase ${timer.phaseIndex + 1} / ${phases.length}`;
+  } else {
+    repEl.textContent = '';
+  }
+
+  // total bar
+  const pct = timer.totalDuration > 0 ? (timer.totalRemaining / timer.totalDuration * 100) : 0;
+  document.getElementById('totalBarFill').style.width = pct + '%';
+  document.getElementById('totalRemLabel').textContent = fmt(timer.totalRemaining);
+
+  // phase strip
+  updatePhaseStrip();
+}
+
+function addLog(msg, type) {
+  const log = document.getElementById('pgLog');
+  const now = new Date();
+  const ts = `${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  const cls = { beep:'log-beep', event:'log-event', done:'log-done', pause:'log-pause', cool:'log-cool' }[type] || 'log-event';
+  entry.innerHTML = `<span class="log-time">${ts}</span><span class="${cls}">${msg}</span>`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+// Init
+renderPhases();
+updateSummary();
+// Recalc section max-heights after dynamic content renders
+setTimeout(() => {
+  document.querySelectorAll('.section-body:not(.collapsed)').forEach(b => {
+    b.style.maxHeight = b.scrollHeight + 'px';
+  });
+}, 100);
+</script>
+</body>
+</html>

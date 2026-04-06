@@ -4,44 +4,55 @@ declare(strict_types=1);
 
 namespace App\Timer;
 
+use App\Enum\BeepLeadIn;
 use Illuminate\Support\Facades\Storage;
+use JsonException;
 
 /**
  * Global app settings persisted to storage/app/settings.json.
  */
 class AppSettings
 {
-    private const PATH = 'settings.json';
+    private const string PATH = 'settings.json';
 
-    public int    $defaultBeepLeadIn = 3;    // 3 | 5
-    public string $defaultEndSound   = 'triple'; // 'triple' | 'chime'
-    public string $soundMode         = 'beep';   // 'beep' | 'voice'
-    public float  $volume            = 0.8;       // 0–1
-    public bool   $keepScreenOn      = true;
+    public BeepLeadIn $defaultBeepLeadIn = BeepLeadIn::Three;    // 3 | 5
+    public string $defaultEndSound = 'triple'; // 'triple' | 'chime'
+    public string $soundMode = 'beep';   // 'beep' | 'voice'
+    public float $volume = 0.8;       // 0–1
+    public bool $keepScreenOn = true;
 
-    private function __construct() {}
+    private function __construct()
+    {
+    }
 
     public static function load(): self
     {
         $settings = new self();
 
         if (Storage::exists(self::PATH)) {
-            $data = json_decode(
-                Storage::get(self::PATH),
-                true,
-                512,
-                JSON_THROW_ON_ERROR,
-            );
-            $settings->defaultBeepLeadIn = (int) ($data['default_beep_lead_in'] ?? 3);
-            $settings->defaultEndSound   = $data['default_end_sound'] ?? 'triple';
-            $settings->soundMode         = $data['sound_mode'] ?? 'beep';
-            $settings->volume            = (float) ($data['volume'] ?? 0.8);
-            $settings->keepScreenOn      = (bool) ($data['keep_screen_on'] ?? true);
+            try {
+                $data = json_decode(
+                    Storage::get(self::PATH),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR,
+                );
+            } catch (JsonException) {
+
+            }
+            $settings->defaultBeepLeadIn = BeepLeadIn::fromNumberToEnum((int)($data['default_beep_lead_in'] ?? 3));
+            $settings->defaultEndSound = $data['default_end_sound'] ?? 'triple';
+            $settings->soundMode = $data['sound_mode'] ?? 'beep';
+            $settings->volume = (float)($data['volume'] ?? 0.8);
+            $settings->keepScreenOn = (bool)($data['keep_screen_on'] ?? true);
         }
 
         return $settings;
     }
 
+    /**
+     * @throws JsonException
+     */
     public function save(): void
     {
         Storage::put(
@@ -54,10 +65,10 @@ class AppSettings
     {
         return [
             'default_beep_lead_in' => $this->defaultBeepLeadIn,
-            'default_end_sound'    => $this->defaultEndSound,
-            'sound_mode'           => $this->soundMode,
-            'volume'               => $this->volume,
-            'keep_screen_on'       => $this->keepScreenOn,
+            'default_end_sound' => $this->defaultEndSound,
+            'sound_mode' => $this->soundMode,
+            'volume' => $this->volume,
+            'keep_screen_on' => $this->keepScreenOn,
         ];
     }
 }

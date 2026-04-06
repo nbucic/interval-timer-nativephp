@@ -1,58 +1,187 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Interval Timer
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Native Android interval timer — **Laravel 13 · PHP 8.5 · NativePHP Mobile v3.2**
 
-## About Laravel
+Fully offline, JSON storage, up to 10 phases × 50 reps with per-phase pause, cooldown, and configurable beep/TTS countdowns.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+| | |
+|---|---|
+| **Framework** | Laravel 13 |
+| **PHP** | 8.5 (embedded) |
+| **NativePHP** | Mobile v3.2 |
+| **Storage** | JSON files (no SQLite) |
+| **Platform** | Android only |
+| **Min SDK** | Android 8 (API 26) |
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## About
 
-## Learning Laravel
+A demo app showcasing NativePHP Mobile — a native, fully offline interval timer running on real Laravel 13 with PHP 8.5, no web server. Users build multi-phase repeatable timers with per-phase pauses and cooldowns, configurable audio countdowns (beep or Android TTS voice), and a live total duration display.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+**Core terminology:**
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **Program** — named collection of up to 10 phases + per-program settings
+- **Phase** — a named timed block with repetitions, a pause between reps, and a cooldown after the final rep
+- **Repetition** — one execution of the phase duration (max 50 per phase)
+- **Pause** — dead-time between repetitions within the same phase
+- **Cooldown** — dead-time after the last rep of a phase, before the next phase begins. The last phase's cooldown is editable but never executed or counted.
+- **Beep Lead-in** — per-program (3s or 5s), seeded from the global default on program creation
+- **Total Duration** — `(duration × reps) + (pause × (reps−1)) + cooldown` for every phase except the last (last phase cooldown excluded)
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+**Phase execution sequence (3 phases, 2 reps each):**
 
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+Phase 1: [REP 1] → [PAUSE] → [REP 2] → [COOLDOWN]
+Phase 2: [REP 1] → [PAUSE] → [REP 2] → [COOLDOWN]
+Phase 3: [REP 1] → [PAUSE] → [REP 2] → [COOLDOWN — skipped]
+END
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+A program always ends on the final rep of the final phase.
 
-## Contributing
+### Tech Stack
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Layer | Technology | Notes |
+|---|---|---|
+| Runtime | NativePHP Mobile v3.2 | PHP 8.5 embedded in Kotlin shell, persistent runtime ~5–30ms/req |
+| Framework | Laravel 13 | PHP attributes, typed config, zero breaking changes from L12 |
+| Language | PHP 8.5 | Pipe operator `\|>`, `clone with`, `readonly class` |
+| Storage | Laravel Storage (JSON) | One JSON file per program + `settings.json` |
+| UI / Web | Livewire v3 + Alpine.js | `wire:poll.1000ms` for timer state, Alpine for 100ms visual tick |
+| UI / Native | EDGE Components | Native Top Bar + Bottom Navigation outside the WebView |
+| Styling | Tailwind CSS v4 | Dark theme, touch-optimised |
+| Audio | Web Audio API + Android TTS | Beep (bundled mp3) or voice (feminine TTS) |
+| Background | Android Foreground Service | Timer runs when backgrounded, auto-pause on incoming calls |
+| Testing | Pest PHP | Fake clock for TimerRunner, temp storage for JSON I/O |
 
-## Code of Conduct
+### Architecture
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+**TimerRunner state machine:**
 
-## Security Vulnerabilities
+```
+idle
+  → running       // executing a repetition
+    → paused      // user hit pause (or phone call)
+    → pause       // dead-time between reps
+    → cooldown    // dead-time after final rep, breathing animation
+  → completed     // all phases done, end sound fires
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+**Key files:**
+
+```
+app/Timer/TimerRunner.php         ← singleton, state machine, beep scheduling
+app/Timer/TimerCursor.php         ← PHP 8.5 readonly class, clone with
+app/Timer/TimerProgram.php        ← JSON ↔ PHP, pipe operator load/save
+app/Livewire/Library.php          ← sorted by last_used_at
+app/Livewire/ProgramEditor.php    ← phase CRUD, 10-phase / 50-rep caps
+app/Livewire/ActiveTimer.php      ← wire:poll + Alpine tick + beep events
+app/Livewire/Settings.php
+app/Events/PhaseChanged.php       ← #[Broadcast] attribute (L13)
+app/Events/ProgramCompleted.php
+resources/views/layouts/app.blade.php   ← EDGE Bottom Nav + Top Bar
+resources/audio/{beep,finish-triple,finish-chime}.mp3
+storage/app/programs/*.json
+storage/app/settings.json
+tests/Feature/{TimerRunnerTest,BeepLogicTest,DurationCalcTest,...}.php
+```
+
+---
+
+## Initial Setup
+
+**Requirements:** PHP 8.5, Composer, Android SDK (for device/emulator builds)
+
+```bash
+# 1. Clone and install dependencies
+git clone <repo-url> interval-timer
+cd interval-timer
+composer install
+
+# 2. Install NativePHP Mobile
+php artisan native:install
+
+# 3. Copy environment file
+cp .env.example .env
+php artisan key:generate
+```
+
+> **Note:** `composer.json` specifies `"php": "^8.5"` — NativePHP auto-detects and matches the bundled runtime.
+>
+> No database setup required. This project uses JSON file storage only — there is no SQLite, no migrations.
+
+### config/nativephp.php
+
+Ensure the following values are set:
+
+```php
+'bundle_id'   => 'com.yourname.intervaltimer',
+'min_sdk'     => 26,   // Android 8
+'compile_sdk' => 35,
+'target_sdk'  => 35,
+```
+
+---
+
+## Build and Run
+
+### Android Emulator
+
+```bash
+php artisan native:run --os=android
+```
+
+### Physical Device
+
+Connect an Android device with USB debugging enabled, then:
+
+```bash
+php artisan native:run --os=android
+```
+
+NativePHP will detect the connected device automatically.
+
+### Development (browser, for UI iteration)
+
+```bash
+php artisan serve
+```
+
+The spec file `interval-timer-spec-v4.html` includes a live JS playground that mirrors the timer logic. Open it directly in a browser to validate phase/beep behaviour without a device.
+
+---
+
+## Running the Test Suite
+
+Tests use [Pest PHP](https://pestphp.com). Run all tests in parallel:
+
+```bash
+php artisan test --parallel
+```
+
+### Test Suites
+
+| Suite | Coverage | Priority |
+|---|---|---|
+| `TimerRunnerTest` | State transitions `idle→running→pause→cooldown→completed`, user pause preserves cursor, `total_remaining` decrements, 10-phase limit | CRITICAL |
+| `BeepLogicTest` | Lead-in 3s/5s, short segment fallback (fires from second 1), fires on rep/pause/cooldown end, no double-fire | CRITICAL |
+| `DurationCalcTest` | Single phase, multi-rep with pause, cooldown on last phase excluded, all 10 phases, `formattedDuration()` mm:ss and h:mm:ss | CRITICAL |
+| `CursorTest` | Advances through reps, skips pause/cooldown when 0, last phase last rep → completed, `clone with` immutability | CRITICAL |
+| `TimerProgramTest` | JSON save/load, `last_used_at` updated on run, `totalDuration()` formula, 50-rep cap, pipe operator load chain | HIGH |
+| `SettingsTest` | Defaults when `settings.json` missing, new program seeded from global defaults, per-program `beep_lead_in` override, volume clamped 0–1 | HIGH |
+| `EndSoundTest` | `ProgramCompleted` fires exactly once, triple vs chime selection, not fired on mid-program phase change | HIGH |
+| `LifecycleTest` | Pause state preserved on phone call, resume restores exact cursor position, kill discards state with no history entry | HIGH |
+
+### Conventions
+
+- Pest PHP throughout — `describe()` blocks per class
+- `TimerRunner` uses a **fake clock** — inject tick count, no real `sleep()`
+- `TimerProgram` writes to a **temp directory**, never real storage
+- Every PR must include tests before merge
+
+---
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+MIT

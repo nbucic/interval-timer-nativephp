@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Timer;
 
+use RangeException;
+
 /**
  * Value object representing a single named timed block within a program.
  */
@@ -15,13 +17,13 @@ readonly class Phase
         public int    $repetitions,   // 1–50
         public int    $pause,         // dead-time between reps (seconds)
         public int    $cooldown,      // dead-time after final rep (seconds)
-        public string $color,         // hex or Tailwind colour token
+        public string $color,         // hex or Tailwind color token
     ) {
         if ($repetitions < 1 || $repetitions > 50) {
-            throw new \RangeException('Repetitions must be between 1 and 50.');
+            throw new RangeException('Repetitions must be between 1 and 50.');
         }
         if ($duration < 1) {
-            throw new \RangeException('Phase duration must be at least 1 second.');
+            throw new RangeException('Phase duration must be at least 1 second.');
         }
     }
 

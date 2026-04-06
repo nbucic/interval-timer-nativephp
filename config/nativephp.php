@@ -128,7 +128,7 @@ return [
         'storage/framework/sessions',
         'storage/framework/cache',
         'storage/framework/testing',
-        'storage/logs/laravel.log'
+        'storage/logs/laravel.log',
     ],
 
     /*
@@ -313,7 +313,7 @@ return [
     |
     | Enable or disable iPad support for your iOS app. When enabled, your app
     | will support iPad devices and all iPad orientations (portrait, upside down,
-    | landscape left, and landscape right) as required by Apple's App Store
+    | landscape left, and landscape right) as required by Apple App Store
     | guidelines. When disabled, your app will be iPhone-only.
     |
     | Note: Once an app is deployed to the App Store with iPad
@@ -333,7 +333,7 @@ return [
     |
     | For iPhone and Android, you can configure specific orientations.
     | For iPad, when enabled above, all orientations are automatically supported
-    | as required by Apple's App Store guidelines.
+    | as required by Apple App Store guidelines.
     |
     | If all orientations are false for iPhone, the build will fail with a
     | helpful error message. If all orientations are false for Android, the
@@ -354,4 +354,8 @@ return [
             'landscape_right' => false,
         ],
     ],
+    'bundle_id' => 'com.nikola.intervaltimer',
+    'min_sdk' => 26,
+    'compile_sdk' => 35,
+    'target_sdk' => 35,
 ];
