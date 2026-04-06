@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Timer\AppSettings;
 use App\Timer\TimerProgram;
+use Illuminate\Support\Facades\Log;
+use Illuminate\View\View;
+use JsonException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use RuntimeException;
 
 #[Layout('layouts.app')]
 #[Title('Library — Interval Timer')]
@@ -26,7 +31,10 @@ class Library extends Component
 
     public function loadPrograms(): void
     {
-        $this->programs = TimerProgram::all();
+        $this->programs = array_map(
+            static fn(TimerProgram $p) => $p->toArray(),
+            TimerProgram::all()
+        );
     }
 
     public function openCreate(): void
@@ -45,13 +53,18 @@ class Library extends Component
     {
         $this->validate(['newName' => 'required|string|max:60']);
 
+        $settings = AppSettings::load();
         $program = TimerProgram::create(trim($this->newName));
+        $program->beepLeadIn = $settings->defaultBeepLeadIn;
+        $program->endSound = $settings->defaultEndSound;
         $program->save();
+
+        Log::info('Message', ['data' => $this]);
 
         $this->showCreate = false;
         $this->newName    = '';
 
-        $this->redirect("/programs/{$program->id}/edit", navigate: true);
+        $this->redirect("/programs/$program->id/edit");
     }
 
     public function deleteProgram(string $id): void
@@ -59,13 +72,14 @@ class Library extends Component
         try {
             $program = TimerProgram::load($id);
             $program->delete();
-        } catch (\RuntimeException) {
+        } catch (RuntimeException|JsonException) {
             // Already gone — ignore.
         }
+
         $this->loadPrograms();
     }
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         return view('livewire.library');
     }

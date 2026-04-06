@@ -60,30 +60,30 @@
         >
             {{-- Tap → go to timer --}}
             <a
-                href="/timer/{{ $program->id }}"
+                href="/timer/{{ $program['id'] }}"
                 wire:navigate
                 class="flex-1 min-w-0"
             >
                 <div class="flex items-center gap-3">
                     {{-- Phase colour dots --}}
-                    <div class="flex gap-1 flex-shrink-0">
-                        @foreach(array_slice($program->phases, 0, 5) as $phase)
+                    <div class="flex gap-1 shrink-0">
+                        @foreach(array_slice($program['phases'], 0, 5) as $phase)
                         <span
                             class="w-2.5 h-2.5 rounded-full"
-                            style="background: {{ $phase->color }}"
+                            style="background: {{ $phase['color'] }}"
                         ></span>
                         @endforeach
-                        @if(count($program->phases) === 0)
+                        @if(count($program['phases']) === 0)
                         <span class="w-2.5 h-2.5 rounded-full bg-gray-700"></span>
                         @endif
                     </div>
 
                     <div class="min-w-0">
-                        <p class="text-white font-semibold text-base truncate">{{ $program->name }}</p>
+                        <p class="text-white font-semibold text-base truncate">{{ $program['name'] }}</p>
                         <p class="text-gray-500 text-xs mt-0.5">
-                            {{ count($program->phases) }} {{ Str::plural('phase', count($program->phases)) }}
-                            @if($program->totalDuration() > 0)
-                                · {{ $program->formattedDuration() }}
+                            {{ count($program['phases']) }} {{ Str::plural('phase', count($program['phases'])) }}
+                            @if($program['total_duration'] > 0)
+                                · {{ sprintf('%d:%02d', intdiv($program['total_duration'], 60), $program['total_duration'] % 60) }}
                             @endif
                         </p>
                     </div>
@@ -92,9 +92,9 @@
 
             {{-- Edit --}}
             <a
-                href="/programs/{{ $program->id }}/edit"
+                href="/programs/{{ $program['id'] }}/edit"
                 wire:navigate
-                class="p-2 text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+                class="p-2 text-gray-500 hover:text-gray-300 transition-colors shrink-0"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -104,9 +104,9 @@
 
             {{-- Delete --}}
             <button
-                wire:click="deleteProgram('{{ $program->id }}')"
-                wire:confirm="Delete '{{ addslashes($program->name) }}'?"
-                class="p-2 text-gray-600 hover:text-red-500 transition-colors flex-shrink-0"
+                wire:click="deleteProgram('{{ $program['id'] }}')"
+                wire:confirm="Delete '{{ addslashes($program['name']) }}'?"
+                class="p-2 text-gray-600 hover:text-red-500 transition-colors shrink-0"
             >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round"

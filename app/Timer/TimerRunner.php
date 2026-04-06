@@ -8,7 +8,6 @@ use App\Enum\StateMachine;
 use App\Events\PhaseChanged;
 use App\Events\ProgramCompleted;
 use Closure;
-use JsonException;
 use RuntimeException;
 
 /**
@@ -18,9 +17,9 @@ use RuntimeException;
  *   $this->app->singleton(TimerRunner::class);
  *
  * State machine transitions:
- *   idle → running → pause → running   (between reps)
+ *   idle → running → pause → running (between reps)
  *              ↓
- *           cooldown → running          (after final rep, before next phase)
+ *           cooldown → running (after final rep, before next phase)
  *              ↓
  *           completed
  *
@@ -28,12 +27,12 @@ use RuntimeException;
  * Resume restores to the previous active state.
  *
  * Beep rule: fire the segment-appropriate end beep based on the expired state.
- *   running  → 'rep_end'
- *   pause    → 'pause_end'
+ *   running → 'rep_end'
+ *   pause → 'pause_end'
  *   cooldown → 'cooldown_end'
  *
  * Countdown beep fires during the last N seconds of each segment (lead-in).
- * If segment < lead-in, countdown starts from second 1.
+ * If a segment < lead-in, the countdown starts from second 1.
  */
 class TimerRunner
 {
@@ -69,12 +68,12 @@ class TimerRunner
 
     // ── Callback registration ─────────────────────────────────────────────────
 
-    public function onTick(\Closure $fn): void      { $this->onTick = $fn; }
-    public function onBeep(\Closure $fn): void      { $this->onBeep = $fn; }
-    public function onPauseBeep(\Closure $fn): void { $this->onPauseBeep = $fn; }
+    public function onTick(Closure $fn): void      { $this->onTick = $fn; }
+    public function onBeep(Closure $fn): void      { $this->onBeep = $fn; }
+    public function onPauseBeep(Closure $fn): void { $this->onPauseBeep = $fn; }
 
     /** Override the clock for tests. fn(): int (seconds since epoch) */
-    public function setClock(\Closure $fn): void    { $this->clockFn = $fn; }
+    public function setClock(Closure $fn): void    { $this->clockFn = $fn; }
 
     // ── Control surface ───────────────────────────────────────────────────────
 
@@ -148,7 +147,7 @@ class TimerRunner
         $this->notifyTick();
     }
 
-    /** Resume from user-paused state, restoring the pre-pause sub-state. */
+    /** Resume from the user-paused state, restoring the pre-pause substate. */
     public function resume(): void
     {
         if (! $this->cursor->isPaused()) {
@@ -252,7 +251,6 @@ class TimerRunner
         $this->notifyTick();
     }
 
-    /** @throws JsonException */
     private function complete(): void
     {
         $this->cursor = $this->cursor->complete();

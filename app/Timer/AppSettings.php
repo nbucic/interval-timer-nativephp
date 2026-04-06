@@ -40,7 +40,7 @@ class AppSettings
             } catch (JsonException) {
 
             }
-            $settings->defaultBeepLeadIn = BeepLeadIn::fromNumberToEnum((int)($data['default_beep_lead_in'] ?? 3));
+            $settings->defaultBeepLeadIn = BeepLeadIn::from((int)($data['default_beep_lead_in'] ?? 3));
             $settings->defaultEndSound = $data['default_end_sound'] ?? 'triple';
             $settings->soundMode = $data['sound_mode'] ?? 'beep';
             $settings->volume = (float)($data['volume'] ?? 0.8);

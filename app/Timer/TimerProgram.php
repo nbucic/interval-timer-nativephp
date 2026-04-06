@@ -113,7 +113,7 @@ class TimerProgram
             name: $data['name'],
             createdAt: $data['created_at'],
             lastUsedAt: $data['last_used_at'] ?? null,
-            beepLeadIn: BeepLeadIn::fromNumberToEnum($data['beep_lead_in'] ?? 3),
+            beepLeadIn: BeepLeadIn::from($data['beep_lead_in'] ?? 3),
             endSound: $data['end_sound'] ?? 'triple',
             phases: array_map(
                 static fn(array $p) => Phase::fromArray($p),
@@ -145,9 +145,6 @@ class TimerProgram
         return sprintf('%d:%02d', $minutes, $seconds);
     }
 
-    /**
-     * @throws JsonException
-     */
     public function touch(): void
     {
         $this->lastUsedAt = now()->toISOString();
@@ -155,14 +152,20 @@ class TimerProgram
     }
 
     /** Save the program to its JSON file.
-     * @throws JsonException
      */
     public function save(): void
     {
-        Storage::put(
-            "programs/$this->id.json",
-            json_encode($this->toArray(), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
-        );
+        try {
+            Storage::put(
+                "programs/$this->id.json",
+                json_encode($this->toArray(), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+            );
+        } catch (JsonException $e) {
+            Storage::put(
+                "programs/$this->id.json",
+                json_encode([], JSON_PRETTY_PRINT),
+            );
+        }
     }
 
     public function toArray(): array
