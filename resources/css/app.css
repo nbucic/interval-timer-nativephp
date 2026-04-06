@@ -1,11 +1,53 @@
 @import 'tailwindcss';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../vendor/livewire/livewire/src/**/*.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
+@source '../../app/Livewire/**/*.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: ui-sans-serif, system-ui, sans-serif;
+
+    /* Timer brand colours */
+    --color-phase-default: #3b82f6;
+    --color-cooldown:      #f97316;
+    --color-pause-gap:     #6b7280;
+    --color-completed:     #22c55e;
 }
+
+/* ─── Cooldown breathing glow ────────────────────────────────────────────────
+   8-second cycle (4s inhale → 4s exhale).
+   Applied to the timer digit container during cooldown state.
+   Architecture hook: WearOS heart-rate data will drive cadence in Phase 4
+   by JS-updating --breath-duration at runtime.
+────────────────────────────────────────────────────────────────────────────── */
+@keyframes breathe {
+    0%, 100% {
+        text-shadow:
+            0 0  8px theme(colors.orange.400 / 40%),
+            0 0 24px theme(colors.orange.400 / 25%),
+            0 0 48px theme(colors.orange.500 / 15%);
+        transform: scale(1);
+    }
+    50% {
+        text-shadow:
+            0 0 16px theme(colors.orange.300 / 70%),
+            0 0 40px theme(colors.orange.400 / 50%),
+            0 0 80px theme(colors.orange.500 / 30%);
+        transform: scale(1.04);
+    }
+}
+
+.cooldown-glow {
+    animation: breathe var(--breath-duration, 8s) ease-in-out infinite;
+    color: theme(colors.orange.400);
+}
+
+/* ─── Safe-area helpers ──────────────────────────────────────────────────── */
+.safe-top    { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* ─── Tap highlight suppression (mobile feel) ───────────────────────────── */
+* { -webkit-tap-highlight-color: transparent; }
