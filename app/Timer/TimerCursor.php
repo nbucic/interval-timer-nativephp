@@ -42,64 +42,51 @@ readonly class TimerCursor
     /** Mark the program as completed. */
     public function complete(): self
     {
-        return clone($this, [
-                'phaseIndex' => $this->phaseIndex,
-                'repIndex' => $this->repIndex,
-                'state' => StateMachine::completed,
-                'remaining' => 0,
-                'totalRemaining' => 0,
-            ]
+        /* PHP 8.5: return clone $this with { state: StateMachine::completed,
+                                              remaining: 0, totalRemaining: 0 }; */
+        return new self(
+            phaseIndex: $this->phaseIndex,
+            repIndex: $this->repIndex,
+            state: StateMachine::completed,
+            remaining: 0,
+            totalRemaining: 0,
         );
     }
 
     /** Move into the cooldown state after the final rep of a phase. */
     public function enterCooldown(int $cooldownDuration, int $totalRemaining): self
     {
-        return clone($this, [
-                'phaseIndex' => $this->phaseIndex,
-                'repIndex' => $this->repIndex,
-                'state' => StateMachine::cooldown,
-                'remaining' => $cooldownDuration,
-                'totalRemaining' => $totalRemaining,
-            ]
+        /* PHP 8.5: return clone $this with { state: StateMachine::cooldown,
+                                              remaining: $cooldownDuration,
+                                              totalRemaining: $totalRemaining }; */
+        return new self(
+            phaseIndex: $this->phaseIndex,
+            repIndex: $this->repIndex,
+            state: StateMachine::cooldown,
+            remaining: $cooldownDuration,
+            totalRemaining: $totalRemaining,
         );
     }
 
     /** Move into the pause state between repetitions. */
     public function enterPause(int $pauseDuration, int $totalRemaining): self
     {
-        return clone($this, [
-                'phaseIndex' => $this->phaseIndex,
-                'repIndex' => $this->repIndex,
-                'state' => StateMachine::pause,
-                'remaining' => $pauseDuration,
-                'totalRemaining' => $totalRemaining,
-            ]
-        );
-    }
-
-    /** Enter the pre-start countdown before the first rep. */
-    public function enterPrepare(int $seconds): self
-    {
-        return clone($this, [
-                'phaseIndex'     => 0,
-                'repIndex'       => 0,
-                'state'          => StateMachine::prepare,
-                'remaining'      => $seconds,
-                'totalRemaining' => $this->totalRemaining,
-            ]
+        /* PHP 8.5: return clone $this with { state: StateMachine::pause,
+                                              remaining: $pauseDuration,
+                                              totalRemaining: $totalRemaining }; */
+        return new self(
+            phaseIndex: $this->phaseIndex,
+            repIndex: $this->repIndex,
+            state: StateMachine::pause,
+            remaining: $pauseDuration,
+            totalRemaining: $totalRemaining,
         );
     }
 
     /** True whenever the timer is actively counting down (not user-paused, not idle). */
     public function isActive(): bool
     {
-        return in_array($this->state, [
-            StateMachine::prepare,
-            StateMachine::running,
-            StateMachine::pause,
-            StateMachine::cooldown,
-        ], true);
+        return in_array($this->state, [StateMachine::running, StateMachine::pause, StateMachine::cooldown], true);
     }
 
     public function isCompleted(): bool
@@ -129,61 +116,82 @@ readonly class TimerCursor
         return $this->state === StateMachine::paused;
     }
 
+    public function isRunning(): bool
+    {
+        return $this->state === StateMachine::running;
+    }
+
     /** Advance to the first rep of the next phase. */
     public function nextPhase(int $phaseIndex, int $repDuration, int $totalRemaining): self
     {
-        return clone($this, [
-                'phaseIndex' => $phaseIndex,
-                'repIndex' => 0,
-                'state' => StateMachine::running,
-                'remaining' => $repDuration,
-                'totalRemaining' => $totalRemaining,
-            ]
+        /* PHP 8.5: return clone $this with { phaseIndex: $phaseIndex,
+                                              repIndex: 0,
+                                              state: StateMachine::running,
+                                              remaining: $repDuration,
+                                              totalRemaining: $totalRemaining }; */
+        return new self(
+            phaseIndex: $phaseIndex,
+            repIndex: 0,
+            state: StateMachine::running,
+            remaining: $repDuration,
+            totalRemaining: $totalRemaining,
         );
     }
 
     /** Advance to the next repetition of the same phase. */
     public function nextRep(int $repDuration, int $totalRemaining): self
     {
-        return clone($this, [
-                'phaseIndex' => $this->phaseIndex,
-                'repIndex' => $this->repIndex + 1,
-                'state' => StateMachine::running,
-                'remaining' => $repDuration,
-                'totalRemaining' => $totalRemaining,
-            ]
+        /* PHP 8.5: return clone $this with { repIndex: $this->repIndex + 1,
+                                              state: StateMachine::running,
+                                              remaining: $repDuration,
+                                              totalRemaining: $totalRemaining }; */
+        return new self(
+            phaseIndex: $this->phaseIndex,
+            repIndex: $this->repIndex + 1,
+            state: StateMachine::running,
+            remaining: $repDuration,
+            totalRemaining: $totalRemaining,
         );
     }
 
     /** User pressed pause (or phone call received). */
     public function pause(): self
     {
-        return clone($this, [
-                'phaseIndex' => $this->phaseIndex,
-                'repIndex' => $this->repIndex,
-                'state' => StateMachine::paused,
-                'remaining' => $this->remaining,
-                'totalRemaining' => $this->totalRemaining,
-            ]
+        /* PHP 8.5: return clone $this with { state: StateMachine::paused }; */
+        return new self(
+            phaseIndex: $this->phaseIndex,
+            repIndex: $this->repIndex,
+            state: StateMachine::paused,
+            remaining: $this->remaining,
+            totalRemaining: $this->totalRemaining,
         );
     }
 
     /** Resume into a named substate (the state that was active pre-pause). */
     public function resumeAs(StateMachine $state): self
     {
-        return clone($this, ['state' => $state]);
+        /* PHP 8.5: return clone $this with { state: $state }; */
+        return clone($this, [
+                'phaseIndex' => $this->phaseIndex,
+                'repIndex' => $this->repIndex,
+                'state' => $state,
+                'remaining' => $this->remaining,
+                'totalRemaining' => $this->totalRemaining,
+            ]
+        );
     }
 
     /** Tick one second off the current segment and the total remaining. */
     public function tick(): self
     {
-        return clone($this, [
-                'phaseIndex' => $this->phaseIndex,
-                'repIndex' => $this->repIndex,
-                'state' => $this->state,
-                'remaining' => max(0, $this->remaining - 1),
-                'totalRemaining' => max(0, $this->totalRemaining - 1),
-            ]
+        /* PHP 8.5: return clone $this with { remaining: max (0, $this->remaining - 1),
+                                              totalRemaining: max(0, $this->totalRemaining - 1) }; */
+        return new self(
+            phaseIndex: $this->phaseIndex,
+            repIndex: $this->repIndex,
+            state: $this->state,
+            remaining: max(0, $this->remaining - 1),
+            totalRemaining: max(0, $this->totalRemaining - 1),
         );
     }
 }

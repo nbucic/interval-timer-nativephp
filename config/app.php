@@ -17,19 +17,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Long-press Pause Platforms
-    |--------------------------------------------------------------------------
-    |
-    | Controls which platforms get the hold-to-pause gesture on the timer screen.
-    | 'all' — enabled in the browser web demo and on Android.
-    | 'android' — enabled only when running inside the NativePHP Android WebView
-    | (detected at runtime via the Android user-agent string).
-    |
-    */
-    'long_press_pause' => env('LONG_PRESS_PAUSE', 'all'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
