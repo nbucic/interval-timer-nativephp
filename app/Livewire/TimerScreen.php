@@ -142,7 +142,7 @@ class TimerScreen extends Component
 
     public function repLabel(): string
     {
-        if (in_array($this->state->value, ['pause', 'cooldown', 'paused', 'completed', 'idle'], true)) {
+        if (in_array($this->state, [StateMachine::pause, StateMachine::cooldown, StateMachine::paused, StateMachine::completed, StateMachine::idle], true)) {
             return '';
         }
         return sprintf('%d / %d', $this->repIndex + 1, $this->phaseReps);
@@ -173,10 +173,10 @@ class TimerScreen extends Component
     public function segmentLabel(): string
     {
         return match ($this->state) {
-            'pause' => 'Pause',
-            'cooldown' => 'Cooldown',
-            'paused' => 'Paused',
-            'completed' => 'Complete!',
+            StateMachine::pause => 'Pause',
+            StateMachine::cooldown => 'Cooldown',
+            StateMachine::paused => 'Paused',
+            StateMachine::completed => 'Complete!',
             default => $this->phaseLabel,
         };
     }
@@ -196,7 +196,7 @@ class TimerScreen extends Component
             $this->dispatch('playPauseBeep');
         });
 
-//        $runner->start();
+        $runner->start();
         $this->syncCursor($runner->cursor(), $program);
 
         // EDGE top bar → program name
