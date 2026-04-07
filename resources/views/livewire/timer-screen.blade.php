@@ -9,8 +9,7 @@
 --}}
 <div
     class="flex flex-col h-full"
-    x-data="timerAudio()"
-    @if($programId && $state === StateMachine::idle) wire:init="start" @endif
+    x-data="timerAudio"
 >
     {{-- ── No program loaded ───────────────────────────────────────────── --}}
     @if(! $programId)
@@ -51,7 +50,7 @@
                 class="w-3 h-3 rounded-full shrink-0"
                 style="background: {{ $state->value === 'PAUSE' ? '#6b7280' : ($state->value === 'COOLDOWN' ? '#f97316' : $phaseColor) }}"
             ></span>
-                <span class="text-gray-300 font-semibold text-base">
+                <span class="text-gray-300 font-semibold text-[96px]">
                 {{ $this->segmentLabel() }}
             </span>
                 @if($this->repLabel())
