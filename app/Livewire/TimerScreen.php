@@ -76,7 +76,6 @@ class TimerScreen extends Component
         $this->soundMode = $settings->soundMode;
         $this->volume = $settings->volume;
 
-
         if ($id) {
             $this->loadProgram($id);
         }
@@ -87,11 +86,10 @@ class TimerScreen extends Component
         $runner = app(TimerRunner::class);
         $program = TimerProgram::load($id);
 
-        $runner->load($program);
-
         $this->programId = $id;
         $this->programName = $program->name;
         $this->endSound = $program->endSound;
+        $this->rehydrateRunner($runner);
 
         $this->syncCursor($runner->cursor(), $program);
 
@@ -127,6 +125,7 @@ class TimerScreen extends Component
     public function pause(): void
     {
         $runner = app(TimerRunner::class);
+        $this->rehydrateRunner($runner);
         $runner->pause();
         $this->syncCursor($runner->cursor(), TimerProgram::load($this->programId));
     }
@@ -164,6 +163,7 @@ class TimerScreen extends Component
     public function resume(): void
     {
         $runner = app(TimerRunner::class);
+        $this->rehydrateRunner($runner);
         $runner->resume();
         $this->syncCursor($runner->cursor(), TimerProgram::load($this->programId));
     }
@@ -187,12 +187,7 @@ class TimerScreen extends Component
         $runner = app(TimerRunner::class);
         $program = TimerProgram::load($this->programId);
 
-        $runner->onBeep(function (string $reason) use ($program): void {
-            $this->handleBeep($reason, $program);
-        });
-        $runner->onPauseBeep(function (): void {
-            $this->dispatch('playPauseBeep');
-        });
+
         $runner->load($program);
 
         $runner->start();
@@ -208,7 +203,7 @@ class TimerScreen extends Component
     {
         // Determine the countdown label for voice mode
         $this->countdownLabel = match ($reason) {
-            'countdown' => $this->remaining . ' seconds',
+            'countdown' => (string)$this->remaining,
             'rep_end' => 'Done',
             'pause_end' => 'Go',
             'cooldown_end' => 'Next',
@@ -223,6 +218,7 @@ class TimerScreen extends Component
     public function tick(): void
     {
         $runner = app(TimerRunner::class);
+        $this->rehydrateRunner($runner);
 
         if (!$runner->cursor()->isActive()) {
             return;
@@ -235,8 +231,34 @@ class TimerScreen extends Component
         $this->syncCursor($cursor, $program);
 
         if ($cursor->isCompleted()) {
+            Log::info('Completed!');
             $this->dispatch('playEndSound', sound: $this->endSound);
             $this->dispatch('topbar-title', title: config('app.name'));
         }
+    }
+
+    private function rehydrateRunner(TimerRunner $runner): void
+    {
+        if (!$this->programId) {
+            return;
+        }
+        $program = TimerProgram::load($this->programId);
+        $runner->load($program);
+
+        $cursor = new TimerCursor(
+            phaseIndex: $this->phaseIndex,
+            repIndex: $this->repIndex,
+            state: $this->state,
+            remaining: $this->remaining,
+            totalRemaining: $this->totalRemaining
+        );
+
+        $runner->cursor = $cursor;
+        $runner->onBeep(function (string $reason) use ($program): void {
+            $this->handleBeep($reason, $program);
+        });
+        $runner->onPauseBeep(function (): void {
+            $this->dispatch('playPauseBeep');
+        });
     }
 }
