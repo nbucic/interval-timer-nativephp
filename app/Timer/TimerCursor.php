@@ -171,13 +171,12 @@ readonly class TimerCursor
     public function resumeAs(StateMachine $state): self
     {
         /* PHP 8.5: return clone $this with { state: $state }; */
-        return clone($this, [
-                'phaseIndex' => $this->phaseIndex,
-                'repIndex' => $this->repIndex,
-                'state' => $state,
-                'remaining' => $this->remaining,
-                'totalRemaining' => $this->totalRemaining,
-            ]
+        return new self(
+            phaseIndex: $this->phaseIndex,
+            repIndex: $this->repIndex,
+            state: $state,
+            remaining: $this->remaining,
+            totalRemaining: $this->totalRemaining,
         );
     }
 
