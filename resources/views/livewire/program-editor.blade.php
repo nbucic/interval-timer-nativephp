@@ -120,7 +120,7 @@
                                 @if($phase['pause'] > 0)
                                     · {{ $phase['pause'] }}s pause
                                 @endif
-                                @if($phase['cooldown'] > 0)
+                                @if($phase['cooldown'] > 0 && !$loop->last)
                                     · {{ $phase['cooldown'] }}s cooldown
                                 @endif
                             </p>
