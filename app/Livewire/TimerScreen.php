@@ -76,6 +76,7 @@ class TimerScreen extends Component
         $this->soundMode = $settings->soundMode;
         $this->volume = $settings->volume;
 
+
         if ($id) {
             $this->loadProgram($id);
         }
@@ -88,15 +89,12 @@ class TimerScreen extends Component
 
         $runner->load($program);
 
-        Log::info("Runner info: {$runner->program()->name}.");
-
         $this->programId = $id;
         $this->programName = $program->name;
         $this->endSound = $program->endSound;
 
         $this->syncCursor($runner->cursor(), $program);
 
-        Log::info('Dispatching settings loaded');
         // Push settings to JS audio layer
         $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, program: $program);
     }
@@ -195,6 +193,7 @@ class TimerScreen extends Component
         $runner->onPauseBeep(function (): void {
             $this->dispatch('playPauseBeep');
         });
+        $runner->load($program);
 
         $runner->start();
         $this->syncCursor($runner->cursor(), $program);
