@@ -170,14 +170,7 @@ readonly class TimerCursor
     /** Resume into a named substate (the state that was active pre-pause). */
     public function resumeAs(StateMachine $state): self
     {
-        /* PHP 8.5: return clone $this with { state: $state }; */
-        return new self(
-            phaseIndex: $this->phaseIndex,
-            repIndex: $this->repIndex,
-            state: $state,
-            remaining: $this->remaining,
-            totalRemaining: $this->totalRemaining,
-        );
+        return clone($this, ['state' => $state]);
     }
 
     /** Tick one second off the current segment and the total remaining. */
