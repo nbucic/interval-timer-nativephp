@@ -8,6 +8,7 @@ use App\Enum\StateMachine;
 use App\Events\PhaseChanged;
 use App\Events\ProgramCompleted;
 use Closure;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -81,6 +82,7 @@ class TimerRunner
     public function load(TimerProgram $program): void
     {
         $this->program = $program;
+
         $this->cursor  = TimerCursor::idle();
     }
 
