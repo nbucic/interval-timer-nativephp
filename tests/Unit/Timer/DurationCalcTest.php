@@ -2,29 +2,24 @@
 
 declare(strict_types=1);
 
-use App\Timer\Phase;
-use App\Timer\TimerProgram;
-use Illuminate\Support\Facades\Storage;
+use App\Models\Program;
 
 // Helper: build a program with given phases without touching Storage
-function makeProgram(array $phaseDefs): TimerProgram
+function makeProgram(array $phaseDefs): Program
 {
-    Storage::fake();
-
-    $prog = TimerProgram::create('Test');
-    foreach ($phaseDefs as $def) {
-        $prog->addPhase(new Phase(...$def));
+    $prog = Program::create(['name' => 'Test']);
+    foreach ($phaseDefs as $i => $def) {
+        $prog->phases()->create(array_merge(['sort_order' => $i], $def));
     }
-    $prog->save();
 
-    return TimerProgram::load($prog->id);
+    return $prog->load('phases');
 }
 
 // ── Formula: (duration×reps) + (pause×(reps-1)) + cooldown ──────────────────
 
 test('single phase no pause no cooldown', function (): void {
     $prog = makeProgram([
-        ['Work', 30, 1, 0, 0, '#3b82f6'],
+        ['label' => 'Work', 'duration' => 30, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#3b82f6'],
     ]);
     expect($prog->totalDuration())->toBe(30);
 });
@@ -67,11 +62,8 @@ test('multiple phases summed correctly', function (): void {
 });
 
 test('zero-duration program returns zero', function (): void {
-    Storage::fake();
-    $prog = TimerProgram::create('Empty');
-    $prog->save();
-    $loaded = TimerProgram::load($prog->id);
-    expect($loaded->totalDuration())->toBe(0);
+    $prog = Program::create(['name' => 'Empty']);
+    expect($prog->totalDuration())->toBe(0);
 });
 
 // ── formattedDuration ─────────────────────────────────────────────────────────
