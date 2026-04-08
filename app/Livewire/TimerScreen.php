@@ -6,10 +6,14 @@ namespace App\Livewire;
 
 use App\Enum\StateMachine;
 use App\Timer\AppSettings;
+use App\Timer\HistoryEntry;
+use App\Timer\HistoryLog;
+use App\Timer\Phase;
 use App\Timer\TimerCursor;
 use App\Timer\TimerProgram;
 use App\Timer\TimerRunner;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use JsonException;
 use Livewire\Attributes\Layout;
@@ -35,14 +39,23 @@ class TimerScreen extends Component
     public string $phaseLabel = '';
     public string $phaseColor = '#3b82f6';
     public int $phaseReps = 1;
+    /** @var array[] Serialised Phase rows for the phase strip */
+    public array $phases = [];
 
     // ── Settings (for the JS audio layer) ────────────────────────────────
     public string $soundMode = 'beep';
     public float $volume = 0.8;
     public string $endSound = 'triple';
 
+    // ── Ring countdown ────────────────────────────────────────────────────
+    public int $programTotalDuration = 0;
+
     // ── Beep lead-in (so JS can display a countdown label) ───────────────
     public string $countdownLabel = '';
+
+    // ── History (shown on Timer tab when no program is loaded) ───────────
+    /** @var array[] serialised HistoryEntry rows + 'program_exists' bool */
+    public array $history = [];
 
     public function discard(): void
     {
@@ -67,9 +80,6 @@ class TimerScreen extends Component
         return sprintf('%d:%02d', intdiv($s, 60), $s % 60);
     }
 
-    /**
-     * @throws JsonException
-     */
     public function mount(?string $id = null): void
     {
         $settings = AppSettings::load();
@@ -78,6 +88,8 @@ class TimerScreen extends Component
 
         if ($id) {
             $this->loadProgram($id);
+        } else {
+            $this->loadHistory();
         }
     }
 
@@ -89,18 +101,54 @@ class TimerScreen extends Component
         $this->programId = $id;
         $this->programName = $program->name;
         $this->endSound = $program->endSound;
+        $this->programTotalDuration = $program->totalDuration();
         $this->rehydrateRunner($runner);
 
         $this->syncCursor($runner->cursor(), $program);
+
+        // Show program name in the top bar as soon as program is loaded
+        $this->dispatch('topbar-title', title: $program->name);
 
         // Push settings to JS audio layer
         $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, program: $program);
     }
 
-    public function requestSettings(): void
+    private function rehydrateRunner(TimerRunner $runner): void
     {
-        $program = $this->programId ? TimerProgram::load($this->programId) : null;
-        $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, program: $program);
+        if (!$this->programId) {
+            return;
+        }
+        $program = TimerProgram::load($this->programId);
+        $runner->load($program);
+
+        $cursor = new TimerCursor(
+            phaseIndex: $this->phaseIndex,
+            repIndex: $this->repIndex,
+            state: $this->state,
+            remaining: $this->remaining,
+            totalRemaining: $this->totalRemaining,
+        );
+
+        $runner->cursor = $cursor;
+        $runner->onBeep(function (string $reason): void {
+            $this->handleBeep($reason);
+        });
+        $runner->onPauseBeep(function (): void {
+            $this->dispatch('playPauseBeep');
+        });
+    }
+
+    private function handleBeep(string $reason): void
+    {
+        // Determine the countdown label for voice mode
+        $this->countdownLabel = match ($reason) {
+            'prepare', 'countdown' => (string)$this->remaining,
+            'rep_end'              => 'Done',
+            'pause_end'            => 'Go',
+            'cooldown_end'         => 'Next',
+            default                => '',
+        };
+        $this->dispatch('playBeep', reason: $reason);
     }
 
     private function syncCursor(TimerCursor $cursor, TimerProgram $program): void
@@ -111,12 +159,31 @@ class TimerScreen extends Component
         $this->phaseIndex = $cursor->phaseIndex;
         $this->repIndex = $cursor->repIndex;
 
+        $this->phases = $program->phases |> (fn($phase) => array_map(
+                static fn(Phase $p) => $p->toArray(),
+                $phase,
+            ));
+
         if (isset($program->phases[$cursor->phaseIndex])) {
             $phase = $program->phases[$cursor->phaseIndex];
             $this->phaseLabel = $phase->label;
             $this->phaseColor = $phase->color;
             $this->phaseReps = $phase->repetitions;
         }
+    }
+
+    private function loadHistory(): void
+    {
+        $this->history = array_map(
+            static function (array $entry): array {
+                $entry['program_exists'] = Storage::exists("programs/{$entry['program_id']}.json");
+                return $entry;
+            },
+            array_map(
+                static fn(HistoryEntry $e) => $e->toArray(),
+                HistoryLog::all(),
+            ),
+        );
     }
 
     /**
@@ -135,23 +202,25 @@ class TimerScreen extends Component
         return view('livewire.timer-screen');
     }
 
-    // ── Computed display helpers ──────────────────────────────────────────
-
     public function repLabel(): string
     {
-        if (in_array($this->state, [StateMachine::pause, StateMachine::cooldown, StateMachine::paused, StateMachine::completed, StateMachine::idle], true)) {
+        if (in_array($this->state, [StateMachine::prepare, StateMachine::cooldown, StateMachine::completed], true)) {
             return '';
         }
         return sprintf('%d / %d', $this->repIndex + 1, $this->phaseReps);
     }
 
-    /**
-     * @throws JsonException
-     */
+    public function requestSettings(): void
+    {
+        $program = $this->programId ? TimerProgram::load($this->programId) : null;
+        $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, program: $program);
+    }
+
     public function restart(): void
     {
         $runner = app(TimerRunner::class);
         $program = TimerProgram::load($this->programId);
+        $this->programTotalDuration = $program->totalDuration();
         $runner->load($program);
         $this->syncCursor($runner->cursor(), $program);
         $this->dispatch('topbar-title', title: config('app.name'));
@@ -171,23 +240,21 @@ class TimerScreen extends Component
     public function segmentLabel(): string
     {
         return match ($this->state) {
-            StateMachine::pause => 'Pause',
+            StateMachine::prepare  => 'Get Ready',
+            StateMachine::pause    => 'Pause',
             StateMachine::cooldown => 'Cooldown',
-            StateMachine::paused => 'Paused',
+            StateMachine::paused   => 'Paused',
             StateMachine::completed => 'Complete!',
             default => $this->phaseLabel,
         };
     }
 
-    /**
-     * @throws JsonException
-     */
     public function start(): void
     {
         $runner = app(TimerRunner::class);
         $program = TimerProgram::load($this->programId);
 
-
+        $this->programTotalDuration = $program->totalDuration();
         $runner->load($program);
 
         $runner->start();
@@ -195,21 +262,6 @@ class TimerScreen extends Component
 
         // EDGE top bar → program name
         $this->dispatch('topbar-title', title: $this->programName);
-    }
-
-    // ── Internals ─────────────────────────────────────────────────────────
-
-    private function handleBeep(string $reason, TimerProgram $program): void
-    {
-        // Determine the countdown label for voice mode
-        $this->countdownLabel = match ($reason) {
-            'countdown' => (string)$this->remaining,
-            'rep_end' => 'Done',
-            'pause_end' => 'Go',
-            'cooldown_end' => 'Next',
-            default => '',
-        };
-        $this->dispatch('playBeep', reason: $reason);
     }
 
     /** Called every second from JS setInterval via wire:poll equivalent.
@@ -235,30 +287,5 @@ class TimerScreen extends Component
             $this->dispatch('playEndSound', sound: $this->endSound);
             $this->dispatch('topbar-title', title: config('app.name'));
         }
-    }
-
-    private function rehydrateRunner(TimerRunner $runner): void
-    {
-        if (!$this->programId) {
-            return;
-        }
-        $program = TimerProgram::load($this->programId);
-        $runner->load($program);
-
-        $cursor = new TimerCursor(
-            phaseIndex: $this->phaseIndex,
-            repIndex: $this->repIndex,
-            state: $this->state,
-            remaining: $this->remaining,
-            totalRemaining: $this->totalRemaining
-        );
-
-        $runner->cursor = $cursor;
-        $runner->onBeep(function (string $reason) use ($program): void {
-            $this->handleBeep($reason, $program);
-        });
-        $runner->onPauseBeep(function (): void {
-            $this->dispatch('playPauseBeep');
-        });
     }
 }

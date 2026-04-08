@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Enum\StateMachine;
-use App\Models\Program;
+use App\Timer\Phase;
 use App\Timer\TimerCursor;
+use App\Timer\TimerProgram;
 use App\Timer\TimerRunner;
+use Illuminate\Support\Facades\Storage;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -20,43 +22,23 @@ function skipPrepare(TimerRunner $runner): void
     for ($i = 0; $i < 5; $i++) $runner->tick();
 }
 
-function onePhaseProgram(int $duration = 10, int $reps = 1, int $pause = 0, int $cooldown = 0): Program
+function onePhaseProgram(int $duration = 10, int $reps = 1, int $pause = 0, int $cooldown = 0): TimerProgram
 {
-    $prog = Program::create(['name' => 'Single Phase']);
-    $prog->phases()->create([
-        'label' => 'Work',
-        'duration' => $duration,
-        'repetitions' => $reps,
-        'pause' => $pause,
-        'cooldown' => $cooldown,
-        'color' => '#3b82f6',
-        'sort_order' => 0,
-    ]);
-    return $prog->load('phases');
+    Storage::fake();
+    $prog = TimerProgram::create('Single Phase');
+    $prog->addPhase(new Phase('Work', $duration, $reps, $pause, $cooldown, '#3b82f6'));
+    $prog->save();
+    return TimerProgram::load($prog->id);
 }
 
-function twoPhaseProgram(): Program
+function twoPhaseProgram(): TimerProgram
 {
-    $prog = Program::create(['name' => 'Two Phases']);
-    $prog->phases()->create([
-        'label' => 'Work',
-        'duration' => 5,
-        'repetitions' => 2,
-        'pause' => 2,
-        'cooldown' => 3,
-        'color' => '#3b82f6',
-        'sort_order' => 0,
-    ]);
-    $prog->phases()->create([
-        'label' => 'Rest',
-        'duration' => 8,
-        'repetitions' => 1,
-        'pause' => 0,
-        'cooldown' => 0,
-        'color' => '#22c55e',
-        'sort_order' => 1,
-    ]);
-    return $prog->load('phases');
+    Storage::fake();
+    $prog = TimerProgram::create('Two Phases');
+    $prog->addPhase(new Phase('Work', 5, 2, 2, 3, '#3b82f6'));
+    $prog->addPhase(new Phase('Rest', 8, 1, 0, 0, '#22c55e'));
+    $prog->save();
+    return TimerProgram::load($prog->id);
 }
 
 // ── idle state ────────────────────────────────────────────────────────────────
@@ -73,14 +55,15 @@ test('tick on idle cursor is a no-op', function (): void {
 });
 
 test('start without load throws RuntimeException', function (): void {
-    expect(fn() => freshRunner()->start())->toThrow(\RuntimeException::class);
+    expect(fn () => freshRunner()->start())->toThrow(\RuntimeException::class);
 });
 
 test('start with empty program throws RuntimeException', function (): void {
-    $prog = Program::create(['name' => 'Empty']);
+    Storage::fake();
+    $prog = TimerProgram::create('Empty'); $prog->save();
     $runner = freshRunner();
-    $runner->load($prog);
-    expect(fn() => $runner->start())->toThrow(\RuntimeException::class);
+    $runner->load(TimerProgram::load($prog->id));
+    expect(fn () => $runner->start())->toThrow(\RuntimeException::class);
 });
 
 // ── idle → prepare ────────────────────────────────────────────────────────────
@@ -162,7 +145,7 @@ test('ticking through cooldown on last phase completes program', function (): vo
     $completed = false;
 
     $runner = freshRunner();
-    $prog = onePhaseProgram(duration: 3, reps: 1, cooldown: 2);
+    $prog   = onePhaseProgram(duration: 3, reps: 1, cooldown: 2);
     $runner->load($prog);
     $runner->start();
     skipPrepare($runner);
@@ -237,11 +220,12 @@ test('pause during pause-segment restores to pause after resume', function (): v
 // ── 10-phase limit ────────────────────────────────────────────────────────────
 
 test('program rejects 11th phase', function (): void {
-    $prog = Program::create(['name' => 'Overflow']);
+    Storage::fake();
+    $prog = TimerProgram::create('Overflow');
     for ($i = 0; $i < 10; $i++) {
-        $prog->addPhase(['label' => "P{$i}", 'duration' => 5, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#3b82f6']);
+        $prog->addPhase(new Phase("P{$i}", 5, 1, 0, 0, '#3b82f6'));
     }
-    expect(fn() => $prog->addPhase(['label' => 'P11', 'duration' => 5, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#3b82f6']))
+    expect(fn () => $prog->addPhase(new Phase('P11', 5, 1, 0, 0, '#3b82f6')))
         ->toThrow(\OverflowException::class);
 });
 
