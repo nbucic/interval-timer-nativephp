@@ -8,6 +8,8 @@ use App\Enum\StateMachine;
 use App\Events\PhaseChanged;
 use App\Events\ProgramCompleted;
 use App\Jobs\WriteHistoryEntry;
+use App\Models\Phase;
+use App\Models\Program;
 use Closure;
 use RuntimeException;
 
@@ -39,7 +41,7 @@ class TimerRunner
 {
     private const PREPARE_SECONDS = 5;
 
-    private ?TimerProgram $program = null;
+    private ?Program $program = null;
     public TimerCursor $cursor {
         set {
             $this->cursor = $value;
@@ -76,10 +78,9 @@ class TimerRunner
     }
 
     /** Load a program and reset the cursor to idle. */
-    public function load(TimerProgram $program): void
+    public function load(Program $program): void
     {
         $this->program = $program;
-
         $this->cursor = TimerCursor::idle();
     }
 
@@ -124,7 +125,7 @@ class TimerRunner
         }
     }
 
-    public function program(): ?TimerProgram
+    public function program(): ?Program
     {
         return $this->program;
     }
@@ -179,7 +180,7 @@ class TimerRunner
         if ($this->program === null) {
             throw new RuntimeException('No program loaded. Call load() first.');
         }
-        if (count($this->program->phases) === 0) {
+        if ($this->program->phases->isEmpty()) {
             throw new RuntimeException('Program has no phases.');
         }
     }
@@ -200,7 +201,7 @@ class TimerRunner
     /** @return Phase[] */
     private function phases(): array
     {
-        return $this->program->phases;
+        return $this->program->phases->all();
     }
 
     /**
@@ -244,7 +245,7 @@ class TimerRunner
 
     /**
      * True when the cursor's remaining falls within the lead-in countdown window.
-     * Uses beepLeadIn->value to extract the int from the BeepLeadIn backed enum.
+     * Uses beep_lead_in->value to extract the int from the BeepLeadIn backed enum.
      */
     private function shouldBeep(TimerCursor $cursor): bool
     {
@@ -252,7 +253,7 @@ class TimerRunner
             return false;
         }
 
-        $leadIn = $this->program->beepLeadIn->value;  // BeepLeadIn: int enum
+        $leadIn = $this->program->beep_lead_in->value;
         $segmentTotal = $this->segmentDurationForCursor($cursor);
         $effectiveLead = ($segmentTotal < $leadIn) ? max(1, $segmentTotal - 1) : $leadIn;
 
@@ -380,7 +381,7 @@ class TimerRunner
 
         ProgramCompleted::dispatch(
             $this->program->id,
-            $this->program->endSound,
+            $this->program->end_sound,
             $totalDuration,
         );
 

@@ -7,15 +7,12 @@ return [
     | Default Queue Connection Name
     |--------------------------------------------------------------------------
     |
-    | Laravel 13 "background" driver: serialises each job closure into a
-    | base64 env-var and spawns a dedicated `artisan invoke-serialized-closure`
-    | process.  No database, no Redis, no persistent storage — purely in-process
-    | / temporary.  Perfect for NativePHP where neither Redis nor SQLite are
-    | available on-device.
+    | The Android runtime hardcodes QUEUE_CONNECTION=database, so the database
+    | driver is always used on-device. The jobs table is created via migration.
     |
     */
 
-    'default' => env('QUEUE_CONNECTION', 'background'),
+    'default' => env('QUEUE_CONNECTION', 'database'),
 
     'connections' => [
 
@@ -23,8 +20,12 @@ return [
             'driver' => 'sync',
         ],
 
-        'background' => [
-            'driver'       => 'background',
+        'database' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => env('DB_QUEUE', 'default'),
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
             'after_commit' => false,
         ],
 
