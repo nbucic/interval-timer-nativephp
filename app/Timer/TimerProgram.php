@@ -195,7 +195,7 @@ class TimerProgram
     #[NoDiscard]
     public function totalDuration(): int
     {
-        return array_reduce(
+        $totalDuration = array_reduce(
             $this->phases,
             static function (int $carry, Phase $phase): int {
                 $repTime = $phase->duration * $phase->repetitions;
@@ -204,5 +204,7 @@ class TimerProgram
             },
             0,
         );
+
+        return $totalDuration - array_last($this->phases)->cooldown;
     }
 }
