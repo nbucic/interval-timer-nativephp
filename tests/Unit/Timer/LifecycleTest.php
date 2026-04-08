@@ -22,6 +22,7 @@ test('pause preserves exact remaining seconds and resumes correctly', function (
     $runner = new TimerRunner();
     $runner->load(TimerProgram::load($prog->id));
     $runner->start();
+    for ($i = 0; $i < 5; $i++) $runner->tick(); // skip prepare
 
     // Run 7 seconds → 13 remaining
     for ($i = 0; $i < 7; $i++) $runner->tick();
@@ -51,6 +52,7 @@ test('user can pause during inter-rep pause and resume to pause state', function
     $runner = new TimerRunner();
     $runner->load(TimerProgram::load($prog->id));
     $runner->start();
+    for ($i = 0; $i < 5; $i++) $runner->tick(); // skip prepare
 
     // Finish rep 1 (5 ticks) → enter pause
     for ($i = 0; $i < 5; $i++) $runner->tick();
@@ -118,6 +120,7 @@ test('last_used_at is set after program completes', function (): void {
     $runner = new TimerRunner();
     $runner->load(TimerProgram::load($prog->id));
     $runner->start();
+    for ($i = 0; $i < 5; $i++) $runner->tick(); // skip prepare
     for ($i = 0; $i < 3; $i++) $runner->tick();
 
     expect($runner->cursor()->isCompleted())->toBeTrue();

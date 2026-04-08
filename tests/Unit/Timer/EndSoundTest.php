@@ -23,7 +23,7 @@ test('ProgramCompleted dispatched exactly once on program finish', function (): 
     $runner = new TimerRunner();
     $runner->load(TimerProgram::load($prog->id));
     $runner->start();
-
+    for ($i = 0; $i < 5; $i++) $runner->tick(); // skip prepare
     for ($i = 0; $i < 3; $i++) $runner->tick();
 
     Event::assertDispatchedTimes(ProgramCompleted::class, 1);
@@ -41,7 +41,7 @@ test('ProgramCompleted carries correct endSound', function (): void {
     $runner = new TimerRunner();
     $runner->load(TimerProgram::load($prog->id));
     $runner->start();
-
+    for ($i = 0; $i < 5; $i++) $runner->tick(); // skip prepare
     for ($i = 0; $i < 2; $i++) $runner->tick();
 
     Event::assertDispatched(ProgramCompleted::class, function (ProgramCompleted $e): bool {
@@ -95,7 +95,7 @@ test('ProgramCompleted carries total duration', function (): void {
     $runner = new TimerRunner();
     $runner->load(TimerProgram::load($prog->id));
     $runner->start();
-
+    for ($i = 0; $i < 5; $i++) $runner->tick(); // skip prepare
     // Rep 1 (5) + pause (3) + rep 2 (5) = 13 ticks
     for ($i = 0; $i < 13; $i++) $runner->tick();
 

@@ -22,7 +22,7 @@ document.addEventListener('alpine:init', () => {
                 console.log('State changed:', stateName);
 
                 clearInterval(this.interval);
-                if (['RUNNING', 'PAUSE', 'COOLDOWN'].includes(stateName)) {
+                if (['PREPARE', 'RUNNING', 'PAUSE', 'COOLDOWN'].includes(stateName)) {
                     this.interval = setInterval(() => this.$wire.tick(), 1000);
                 }
             });
@@ -31,6 +31,8 @@ document.addEventListener('alpine:init', () => {
                 console.log('playBeep', reason);
                 if (this.soundMode === 'voice') {
                     this.audio.speak(this.voiceText(reason));
+                } else if (reason === 'prepare') {
+                    this.audio.prepareBeep();
                 } else {
                     this.audio.beep();
                 }
@@ -50,6 +52,7 @@ document.addEventListener('alpine:init', () => {
         },
         voiceText(reason) {
             const map = {
+                prepare:     this.$wire?.countdownLabel ?? '',
                 countdown:   this.$wire?.countdownLabel ?? 'Get ready',
                 rep_end:     'Done',
                 pause_end:   'Go',

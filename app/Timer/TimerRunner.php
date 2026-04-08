@@ -7,6 +7,7 @@ namespace App\Timer;
 use App\Enum\StateMachine;
 use App\Events\PhaseChanged;
 use App\Events\ProgramCompleted;
+use App\Jobs\WriteHistoryEntry;
 use Closure;
 use RuntimeException;
 
@@ -36,6 +37,8 @@ use RuntimeException;
  */
 class TimerRunner
 {
+    private const PREPARE_SECONDS = 5;
+
     private ?TimerProgram $program = null;
     public TimerCursor $cursor {
         set {
@@ -72,11 +75,6 @@ class TimerRunner
         $this->cursor = TimerCursor::idle();
     }
 
-    public function isRunning(): bool
-    {
-        return $this->cursor->isRunning();
-    }
-
     /** Load a program and reset the cursor to idle. */
     public function load(TimerProgram $program): void
     {
@@ -102,10 +100,14 @@ class TimerRunner
         $this->onTick = $fn;
     }
 
-    /** User-initiated pause (or PhoneStateListener). */
+    /** User-initiated pause (or PhoneStateListener). Cannot pause during prepare. */
     public function pause(): void
     {
         if (!$this->cursor->isActive()) {
+            return;
+        }
+
+        if ($this->cursor->state === StateMachine::prepare) {
             return;
         }
 
@@ -140,7 +142,7 @@ class TimerRunner
         $this->notifyTick();
     }
 
-    /** Start the timer from idle. */
+    /** Start the timer from idle — enters a 5-second PREPARE countdown first. */
     public function start(): void
     {
         $this->assertProgramLoaded();
@@ -151,6 +153,12 @@ class TimerRunner
             );
         }
 
+        $this->cursor = $this->cursor->enterPrepare(self::PREPARE_SECONDS);
+    }
+
+    /** Transition from prepare → running, initialising the first rep. */
+    private function beginFirstRep(): void
+    {
         $phase = $this->currentPhase();
         $totalRemaining = $this->program->totalDuration();
 
@@ -163,6 +171,7 @@ class TimerRunner
         );
 
         PhaseChanged::dispatch($this->program->id, 0, $phase, 0);
+        $this->notifyTick();
     }
 
     private function assertProgramLoaded(): void
@@ -184,8 +193,7 @@ class TimerRunner
 
     private function currentPhase(): Phase
     {
-        // PHP 8.5: array_first_value($this->phases())
-        return ($this->phases()[0] ?? null)
+        return array_first($this->phases())
             ?? throw new RuntimeException('Program has no phases.');
     }
 
@@ -206,6 +214,18 @@ class TimerRunner
         }
 
         $cursor = $this->cursor->tick();
+
+        // Prepare: beep every second (bypass lead-in logic), transition when done
+        if ($cursor->state === StateMachine::prepare) {
+            if ($cursor->remaining > 0) {
+                $this->fireBeep('prepare');
+                $this->cursor = $cursor;
+                $this->notifyTick();
+            } else {
+                $this->beginFirstRep();
+            }
+            return;
+        }
 
         if ($this->shouldBeep($cursor)) {
             $this->fireBeep('countdown');
@@ -244,10 +264,11 @@ class TimerRunner
         $phase = $this->phases()[$cursor->phaseIndex];
 
         return match ($cursor->state) {
-            StateMachine::running => $phase->duration,
-            StateMachine::pause => $phase->pause,
+            StateMachine::prepare  => self::PREPARE_SECONDS,
+            StateMachine::running  => $phase->duration,
+            StateMachine::pause    => $phase->pause,
             StateMachine::cooldown => $phase->cooldown,
-            default => 0,
+            default                => 0,
         };
     }
 
@@ -355,10 +376,19 @@ class TimerRunner
     {
         $this->cursor = $this->cursor->complete();
 
+        $totalDuration = $this->program->totalDuration();
+
         ProgramCompleted::dispatch(
             $this->program->id,
             $this->program->endSound,
-            $this->program->totalDuration(),
+            $totalDuration,
+        );
+
+        WriteHistoryEntry::dispatch(
+            $this->program->id,
+            $this->program->name,
+            now()->toISOString(),
+            $totalDuration,
         );
 
         $this->program->touch();

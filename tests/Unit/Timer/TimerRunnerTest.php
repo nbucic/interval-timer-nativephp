@@ -16,6 +16,12 @@ function freshRunner(): TimerRunner
     return new TimerRunner();
 }
 
+/** Tick through the 5-second PREPARE countdown so the runner enters RUNNING. */
+function skipPrepare(TimerRunner $runner): void
+{
+    for ($i = 0; $i < 5; $i++) $runner->tick();
+}
+
 function onePhaseProgram(int $duration = 10, int $reps = 1, int $pause = 0, int $cooldown = 0): TimerProgram
 {
     Storage::fake();
@@ -60,15 +66,34 @@ test('start with empty program throws RuntimeException', function (): void {
     expect(fn () => $runner->start())->toThrow(\RuntimeException::class);
 });
 
-// ── idle → running ────────────────────────────────────────────────────────────
+// ── idle → prepare ────────────────────────────────────────────────────────────
 
-test('start transitions to running state', function (): void {
+test('start transitions to prepare state with 5s remaining', function (): void {
     $runner = freshRunner();
     $runner->load(onePhaseProgram(10));
     $runner->start();
 
+    expect($runner->cursor()->state)->toBe(StateMachine::prepare)
+        ->and($runner->cursor()->remaining)->toBe(5);
+});
+
+test('after 5 prepare ticks runner enters running state', function (): void {
+    $runner = freshRunner();
+    $runner->load(onePhaseProgram(10));
+    $runner->start();
+    skipPrepare($runner);
+
     expect($runner->cursor()->state)->toBe(StateMachine::running)
         ->and($runner->cursor()->remaining)->toBe(10);
+});
+
+test('pause is a no-op during prepare', function (): void {
+    $runner = freshRunner();
+    $runner->load(onePhaseProgram(10));
+    $runner->start();
+    $runner->pause();
+
+    expect($runner->cursor()->state)->toBe(StateMachine::prepare);
 });
 
 // ── running → pause (inter-rep) ───────────────────────────────────────────────
@@ -77,6 +102,7 @@ test('tick at rep end with pause configured enters pause state', function (): vo
     $runner = freshRunner();
     $runner->load(onePhaseProgram(duration: 5, reps: 2, pause: 3));
     $runner->start();
+    skipPrepare($runner);
 
     for ($i = 0; $i < 5; $i++) $runner->tick();
 
@@ -90,6 +116,7 @@ test('ticking through pause advances to next rep', function (): void {
     $runner = freshRunner();
     $runner->load(onePhaseProgram(duration: 5, reps: 2, pause: 3));
     $runner->start();
+    skipPrepare($runner);
 
     for ($i = 0; $i < 5; $i++) $runner->tick();
     for ($i = 0; $i < 3; $i++) $runner->tick();
@@ -100,15 +127,16 @@ test('ticking through pause advances to next rep', function (): void {
 
 // ── running → cooldown ────────────────────────────────────────────────────────
 
-test('last rep with cooldown enters cooldown state', function (): void {
+test('last rep with cooldown does not enter cooldown state', function (): void {
     $runner = freshRunner();
-    $runner->load(onePhaseProgram(duration: 5, reps: 1, cooldown: 4));
+    $runner->load(onePhaseProgram(duration: 5, cooldown: 4));
     $runner->start();
+    skipPrepare($runner);
 
     for ($i = 0; $i < 5; $i++) $runner->tick();
 
-    expect($runner->cursor()->state)->toBe(StateMachine::cooldown)
-        ->and($runner->cursor()->remaining)->toBe(4);
+    expect($runner->cursor()->state)->toBe(StateMachine::completed)
+        ->and($runner->cursor()->remaining)->toBe(0);
 });
 
 // ── cooldown → completed (single phase) ───────────────────────────────────────
@@ -120,6 +148,7 @@ test('ticking through cooldown on last phase completes program', function (): vo
     $prog   = onePhaseProgram(duration: 3, reps: 1, cooldown: 2);
     $runner->load($prog);
     $runner->start();
+    skipPrepare($runner);
 
     $runner->onTick(function (TimerCursor $c) use (&$completed): void {
         if ($c->isCompleted()) $completed = true;
@@ -137,6 +166,7 @@ test('completing all reps+cooldown of phase 0 advances to phase 1', function ():
     $runner = freshRunner();
     $runner->load(twoPhaseProgram());
     $runner->start();
+    skipPrepare($runner);
 
     for ($i = 0; $i < 5; $i++) $runner->tick();  // rep 0
     for ($i = 0; $i < 2; $i++) $runner->tick();  // pause
@@ -153,6 +183,7 @@ test('pause sets cursor to paused', function (): void {
     $runner = freshRunner();
     $runner->load(onePhaseProgram(10));
     $runner->start();
+    skipPrepare($runner);
     $runner->tick();
     $runner->pause();
 
@@ -164,6 +195,7 @@ test('resume restores running state with same remaining', function (): void {
     $runner = freshRunner();
     $runner->load(onePhaseProgram(10));
     $runner->start();
+    skipPrepare($runner);
     $runner->tick();
     $runner->pause();
     $runner->resume();
@@ -176,6 +208,7 @@ test('pause during pause-segment restores to pause after resume', function (): v
     $runner = freshRunner();
     $runner->load(onePhaseProgram(duration: 5, reps: 2, pause: 5));
     $runner->start();
+    skipPrepare($runner);
 
     for ($i = 0; $i < 5; $i++) $runner->tick(); // into pause state
     $runner->pause();

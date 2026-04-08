@@ -147,6 +147,23 @@ class ProgramEditor extends Component
 
     // ── Computed ─────────────────────────────────────────────────────────
 
+    /**
+     * True when the phase form is open for the last phase in the list
+     * (or for a new phase that will become the last).
+     * Used in the view to grey out the cooldown field.
+     */
+    public function editingIsLastPhase(): bool
+    {
+        $count = count($this->phases);
+        if ($count === 0) {
+            return true; // first (and only) phase being added → will be last
+        }
+        if ($this->editingPhaseIndex === null) {
+            return true; // adding a new phase → will be appended as last
+        }
+        return $this->editingPhaseIndex === $count - 1;
+    }
+
     private function resetPhaseForm(): void
     {
         $this->phaseLabel = '';

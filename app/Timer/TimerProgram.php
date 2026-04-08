@@ -54,13 +54,13 @@ class TimerProgram
         $this->phases = $phases;
     }
 
-    /** Return all saved programs, newest first. */
+    /** Return all saved programs, sorted by last_used_at desc (falling back to created_at). */
     public static function all(): array
     {
         return collect(Storage::files('programs'))
             ->filter(fn(string $p) => str_ends_with($p, '.json'))
             ->map(fn(string $p) => self::load(basename($p, '.json')))
-            ->sortByDesc(fn(self $prog) => $prog->createdAt)
+            ->sortByDesc(fn(self $prog) => $prog->lastUsedAt ?? $prog->createdAt)
             ->values()
             ->all();
     }
@@ -84,14 +84,8 @@ class TimerProgram
     /**
      * Load from a JSON file.
      *
-     * PHP 8.5 pipe-operator version (requires NativePHP's PHP 8.5 runtime):
+     * PHP 8.5 pipe operator chains Storage::get → json_decode → hydrate.
      *
-     *   return Storage::get("programs/{$id}.json")
-     *       |> json_decode($$, true, 512, JSON_THROW_ON_ERROR)
-     *       |> self::hydrate($$);
-     *
-     * Equivalent without the pipe operator (PHP 8.4-safe):
-     * @throws JsonException
      */
     public static function load(string $id): self
     {
@@ -101,9 +95,9 @@ class TimerProgram
             throw new RuntimeException("Program not found: $id");
         }
 
-        $json = Storage::get($path);
-        $data = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
-        return self::hydrate($data);
+        return Storage::get($path)
+            |> (fn($j) => json_decode($j, true, 512, JSON_THROW_ON_ERROR))
+            |> self::hydrate(...);
     }
 
     private static function hydrate(array $data): self
@@ -160,7 +154,7 @@ class TimerProgram
                 "programs/$this->id.json",
                 json_encode($this->toArray(), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
             );
-        } catch (JsonException $e) {
+        } catch (JsonException) {
             Storage::put(
                 "programs/$this->id.json",
                 json_encode([], JSON_PRETTY_PRINT),
@@ -205,6 +199,6 @@ class TimerProgram
             0,
         );
 
-        return $totalDuration - array_last($this->phases)->cooldown;
+        return $totalDuration - array_last($this->phases)?->cooldown;
     }
 }

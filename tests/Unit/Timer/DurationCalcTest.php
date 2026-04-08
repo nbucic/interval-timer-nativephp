@@ -50,7 +50,7 @@ test('cooldown is added once after final rep', function (): void {
     $prog = makeProgram([
         ['label' => 'Work', 'duration' => 10, 'repetitions' => 2, 'pause' => 5, 'cooldown' => 8, 'color' => '#3b82f6'],
     ]);
-    expect($prog->totalDuration())->toBe(33);
+    expect($prog->totalDuration())->toBe(25);
 });
 
 test('multiple phases summed correctly', function (): void {
@@ -63,7 +63,7 @@ test('multiple phases summed correctly', function (): void {
         ['label' => 'Work',   'duration' => 10, 'repetitions' => 3, 'pause' => 5,  'cooldown' => 0,  'color' => '#3b82f6'],
         ['label' => 'Cool',   'duration' => 20, 'repetitions' => 1, 'pause' => 0,  'cooldown' => 10, 'color' => '#6b7280'],
     ]);
-    expect($prog->totalDuration())->toBe(100);
+    expect($prog->totalDuration())->toBe(90);
 });
 
 test('zero-duration program returns zero', function (): void {
