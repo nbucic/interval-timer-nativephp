@@ -3,33 +3,35 @@
 declare(strict_types=1);
 
 use App\Enum\BeepLeadIn;
-use App\Timer\Phase;
-use App\Timer\TimerProgram;
+use App\Models\Program;
 use App\Timer\TimerRunner;
-use Illuminate\Support\Facades\Storage;
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
 // Returns an object so mutations from the closure are visible to the caller.
 // (PHP array destructuring copies values; stdClass passes by handle.)
 
-/**
- * @throws JsonException
- */
+function createProgram(string $name, array $phases = [], int $leadIn = 3): Program
+{
+    $prog = Program::create([
+        'name' => $name,
+        'beep_lead_in' => BeepLeadIn::from($leadIn),
+    ]);
+
+    foreach ($phases as $index => $phase) {
+        $prog->phases()->create(array_merge($phase, ['sort_order' => $index]));
+    }
+
+    return $prog;
+}
+
 function createBeepRunner(array $phases = [], int $leadIn = 3): object
 {
-    Storage::fake();
-
-    $prog = TimerProgram::create('Beep Test');
-    $prog->beepLeadIn = BeepLeadIn::from($leadIn);
-    foreach ($phases as $phase) {
-        $prog->addPhase($phase);
-    }
-    $prog->save();
+    $prog = createProgram('Beep Test', $phases, $leadIn);
 
     $ctx = new stdClass();
     $ctx->beeps = [];
     $ctx->runner = new TimerRunner();
-    $ctx->runner->load(TimerProgram::load($prog->id));
+    $ctx->runner->load($prog->load('phases'));
 
     $ctx->runner->onBeep(function (string $reason) use ($ctx): void {
         $ctx->beeps[] = $reason;
@@ -44,23 +46,28 @@ function createBeepRunner(array $phases = [], int $leadIn = 3): object
     return $ctx;
 }
 
-function createPhase(string $name, int $duration, int $reps = 1, int $pause = 0, int $cooldown = 0, string $color = "#3b82f6"): Phase
+function createPhase(string $name, int $duration, int $reps = 1, int $pause = 0, int $cooldown = 0, string $color = "#3b82f6"): array
 {
-    return new Phase($name, $duration, $reps, $pause, $cooldown, $color);
+    return [
+        'label' => $name,
+        'duration' => $duration,
+        'repetitions' => $reps,
+        'pause' => $pause,
+        'cooldown' => $cooldown,
+        'color' => $color,
+    ];
 }
 
 // ── Prepare beep ──────────────────────────────────────────────────────────────
 
 test('prepare beep fires once per tick during the 5s prepare countdown', function (): void {
-    Storage::fake();
-
-    $prog = TimerProgram::create('Prepare beep test');
-    $prog->addPhase(new Phase('Work', 10, 1, 0, 0, '#3b82f6'));
-    $prog->save();
+    $prog = createProgram('Prepare beep test', [
+        createPhase('Work', duration: 10),
+    ]);
 
     $beeps = [];
     $runner = new TimerRunner();
-    $runner->load(TimerProgram::load($prog->id));
+    $runner->load($prog->load('phases'));
     $runner->onBeep(function (string $reason) use (&$beeps): void {
         $beeps[] = $reason;
     });
@@ -68,18 +75,15 @@ test('prepare beep fires once per tick during the 5s prepare countdown', functio
 
     for ($i = 0; $i < 5; $i++) $runner->tick();
 
-    $prepareCount = count(array_filter($beeps, fn ($r) => $r === 'prepare'));
+    $prepareCount = count(array_filter($beeps, fn($r) => $r === 'prepare'));
     // Ticks bring remaining 5→4→3→2→1→0 (beginFirstRep); beep fires while remaining > 0
-    expect($prepareCount)->toBe(4);
-    // No 'countdown' beeps should fire during prepare
-    expect($beeps)->not->toContain('countdown');
+    expect($prepareCount)->toBe(4)
+        ->and($beeps)->not->toContain('countdown');
 });
 
 // ── Lead-in 3s ────────────────────────────────────────────────────────────────
 
-test(/**
- * @throws JsonException
- */ 'beep fires during last 3 seconds of a 10s rep (3s lead-in)',
+test('beep fires during last 3 seconds of a 10s rep (3s lead-in)',
     /**
      * @throws JsonException
      */
@@ -96,9 +100,6 @@ test(/**
     });
 
 test('beep fires exactly 3 times during last 3 seconds of 10s rep',
-    /**
-     * @throws JsonException
-     */
     function (): void {
         $ctx = createBeepRunner([
             createPhase(name: 'Work', duration: 10),
@@ -236,13 +237,11 @@ test('onPauseBeep fires exactly once when user pauses',
      * @throws JsonException
      */
     function (): void {
-        Storage::fake();
-        $prog = TimerProgram::create('Pause beep test');
-        $prog->addPhase(new Phase('Work', 20, 1, 0, 0, '#3b82f6'));
-        $prog->save();
+        $prog = Program::query()->create(['name' => 'Pause beep test']);
+        $prog->phases()->create(['label' => 'Work', 'duration' => 20, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#3b82f6', 'sort_order' => 0]);
 
         $runner = new TimerRunner();
-        $runner->load(TimerProgram::load($prog->id));
+        $runner->load($prog->load('phases'));
 
         $pauseBeepCount = 0;
         $runner->onPauseBeep(function () use (&$pauseBeepCount): void {
@@ -262,13 +261,11 @@ test('onPauseBeep does not fire on resume',
      * @throws JsonException
      */
     function (): void {
-        Storage::fake();
-        $prog = TimerProgram::create('Resume test');
-        $prog->addPhase(new Phase('Work', 20, 1, 0, 0, '#3b82f6'));
-        $prog->save();
+        $prog = Program::query()->create(['name' => 'Resume test']);
+        $prog->phases()->create(['label' => 'Work', 'duration' => 20, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#3b82f6', 'sort_order' => 0]);
 
         $runner = new TimerRunner();
-        $runner->load(TimerProgram::load($prog->id));
+        $runner->load($prog->load('phases'));
 
         $pauseBeepCount = 0;
         $runner->onPauseBeep(function () use (&$pauseBeepCount): void {

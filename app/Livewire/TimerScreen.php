@@ -5,17 +5,14 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enum\StateMachine;
-use App\Timer\AppSettings;
-use App\Timer\HistoryEntry;
-use App\Timer\HistoryLog;
-use App\Timer\Phase;
+use App\Models\HistoryEntry;
+use App\Models\Phase;
+use App\Models\Program;
+use App\Models\Setting;
 use App\Timer\TimerCursor;
-use App\Timer\TimerProgram;
 use App\Timer\TimerRunner;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
-use JsonException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -29,7 +26,7 @@ class TimerScreen extends Component
     public string $programName = '';
 
     // ── Cursor snapshot (serializable scalars for Livewire) ──────────────
-    public StateMachine $state = StateMachine::idle;   // mirrors TimerCursor->state
+    public StateMachine $state = StateMachine::idle;
     public int $remaining = 0;
     public int $totalRemaining = 0;
     public int $phaseIndex = 0;
@@ -57,34 +54,11 @@ class TimerScreen extends Component
     /** @var array[] serialised HistoryEntry rows + 'program_exists' bool */
     public array $history = [];
 
-    public function discard(): void
-    {
-        app(TimerRunner::class)->discard();
-        $this->state = StateMachine::idle;
-        $this->remaining = 0;
-        $this->totalRemaining = 0;
-        $this->dispatch('topbar-title', title: config('app.name'));
-    }
-
-    public function formattedRemaining(): string
-    {
-        $s = $this->remaining;
-        return sprintf('%d:%02d', intdiv($s, 60), $s % 60);
-    }
-
-    // ── Timer controls ────────────────────────────────────────────────────
-
-    public function formattedTotal(): string
-    {
-        $s = $this->totalRemaining;
-        return sprintf('%d:%02d', intdiv($s, 60), $s % 60);
-    }
-
     public function mount(?string $id = null): void
     {
-        $settings = AppSettings::load();
-        $this->soundMode = $settings->soundMode;
-        $this->volume = $settings->volume;
+        $settings = Setting::current();
+        $this->soundMode = $settings->sound_mode;
+        $this->volume    = $settings->volume;
 
         if ($id) {
             $this->loadProgram($id);
@@ -93,39 +67,157 @@ class TimerScreen extends Component
         }
     }
 
+    // ── Timer controls ────────────────────────────────────────────────────
+
     public function loadProgram(string $id): void
     {
-        $runner = app(TimerRunner::class);
-        $program = TimerProgram::load($id);
+        $runner  = app(TimerRunner::class);
+        $program = Program::with('phases')->findOrFail($id);
 
-        $this->programId = $id;
-        $this->programName = $program->name;
-        $this->endSound = $program->endSound;
+        $this->programId           = $id;
+        $this->programName         = $program->name;
+        $this->endSound            = $program->end_sound;
         $this->programTotalDuration = $program->totalDuration();
         $this->rehydrateRunner($runner);
 
         $this->syncCursor($runner->cursor(), $program);
 
-        // Show program name in the top bar as soon as program is loaded
         $this->dispatch('topbar-title', title: $program->name);
-
-        // Push settings to JS audio layer
         $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, program: $program);
     }
+
+    public function discard(): void
+    {
+        app(TimerRunner::class)->discard();
+        $this->state          = StateMachine::idle;
+        $this->remaining      = 0;
+        $this->totalRemaining = 0;
+        $this->dispatch('topbar-title', title: config('app.name'));
+    }
+
+    public function pause(): void
+    {
+        $runner = app(TimerRunner::class);
+        $this->rehydrateRunner($runner);
+        $runner->pause();
+        $this->syncCursor($runner->cursor(), Program::with('phases')->findOrFail($this->programId));
+    }
+
+    public function resume(): void
+    {
+        $runner = app(TimerRunner::class);
+        $this->rehydrateRunner($runner);
+        $runner->resume();
+        $this->syncCursor($runner->cursor(), Program::with('phases')->findOrFail($this->programId));
+    }
+
+    public function restart(): void
+    {
+        $runner  = app(TimerRunner::class);
+        $program = Program::with('phases')->findOrFail($this->programId);
+        $this->programTotalDuration = $program->totalDuration();
+        $runner->load($program);
+        $this->syncCursor($runner->cursor(), $program);
+        $this->dispatch('topbar-title', title: config('app.name'));
+    }
+
+    public function start(): void
+    {
+        $runner  = app(TimerRunner::class);
+        $program = Program::with('phases')->findOrFail($this->programId);
+
+        $this->programTotalDuration = $program->totalDuration();
+        $runner->load($program);
+        $runner->start();
+        $this->syncCursor($runner->cursor(), $program);
+
+        $this->dispatch('topbar-title', title: $this->programName);
+    }
+
+    /** Called every second from JS setInterval via wire:poll equivalent. */
+    public function tick(): void
+    {
+        $runner = app(TimerRunner::class);
+        $this->rehydrateRunner($runner);
+
+        if (!$runner->cursor()->isActive()) {
+            return;
+        }
+
+        $runner->tick();
+        $cursor  = $runner->cursor();
+        $program = Program::with('phases')->findOrFail($this->programId);
+
+        $this->syncCursor($cursor, $program);
+
+        if ($cursor->isCompleted()) {
+            Log::info('Completed!');
+            $this->dispatch('playEndSound', sound: $this->endSound);
+            $this->dispatch('topbar-title', title: config('app.name'));
+        }
+    }
+
+    public function requestSettings(): void
+    {
+        $program = $this->programId ? Program::with('phases')->find($this->programId) : null;
+        $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, program: $program);
+    }
+
+    public function render(): View
+    {
+        return view('livewire.timer-screen');
+    }
+
+    // ── Display helpers ───────────────────────────────────────────────────
+
+    public function formattedRemaining(): string
+    {
+        $s = $this->remaining;
+        return sprintf('%d:%02d', intdiv($s, 60), $s % 60);
+    }
+
+    public function formattedTotal(): string
+    {
+        $s = $this->totalRemaining;
+        return sprintf('%d:%02d', intdiv($s, 60), $s % 60);
+    }
+
+    public function repLabel(): string
+    {
+        if (in_array($this->state, [StateMachine::prepare, StateMachine::cooldown, StateMachine::completed], true)) {
+            return '';
+        }
+        return sprintf('%d / %d', $this->repIndex + 1, $this->phaseReps);
+    }
+
+    public function segmentLabel(): string
+    {
+        return match ($this->state) {
+            StateMachine::prepare   => 'Get Ready',
+            StateMachine::pause     => 'Pause',
+            StateMachine::cooldown  => 'Cooldown',
+            StateMachine::paused    => 'Paused',
+            StateMachine::completed => 'Complete!',
+            default                 => $this->phaseLabel,
+        };
+    }
+
+    // ── Internals ─────────────────────────────────────────────────────────
 
     private function rehydrateRunner(TimerRunner $runner): void
     {
         if (!$this->programId) {
             return;
         }
-        $program = TimerProgram::load($this->programId);
+
+        $program = Program::with('phases')->findOrFail($this->programId);
         $runner->load($program);
 
         $cursor = new TimerCursor(
-            phaseIndex: $this->phaseIndex,
-            repIndex: $this->repIndex,
-            state: $this->state,
-            remaining: $this->remaining,
+            phaseIndex:     $this->phaseIndex,
+            repIndex:       $this->repIndex,
+            state:          $this->state,
+            remaining:      $this->remaining,
             totalRemaining: $this->totalRemaining,
         );
 
@@ -140,9 +232,8 @@ class TimerScreen extends Component
 
     private function handleBeep(string $reason): void
     {
-        // Determine the countdown label for voice mode
         $this->countdownLabel = match ($reason) {
-            'prepare', 'countdown' => (string)$this->remaining,
+            'prepare', 'countdown' => (string) $this->remaining,
             'rep_end'              => 'Done',
             'pause_end'            => 'Go',
             'cooldown_end'         => 'Next',
@@ -151,141 +242,49 @@ class TimerScreen extends Component
         $this->dispatch('playBeep', reason: $reason);
     }
 
-    private function syncCursor(TimerCursor $cursor, TimerProgram $program): void
+    private function syncCursor(TimerCursor $cursor, Program $program): void
     {
-        $this->state = $cursor->state;
-        $this->remaining = $cursor->remaining;
+        $this->state          = $cursor->state;
+        $this->remaining      = $cursor->remaining;
         $this->totalRemaining = $cursor->totalRemaining;
-        $this->phaseIndex = $cursor->phaseIndex;
-        $this->repIndex = $cursor->repIndex;
+        $this->phaseIndex     = $cursor->phaseIndex;
+        $this->repIndex       = $cursor->repIndex;
 
-        $this->phases = $program->phases |> (fn($phase) => array_map(
-                static fn(Phase $p) => $p->toArray(),
-                $phase,
-            ));
+        $this->phases = $program->phases
+            ->map(fn(Phase $p) => [
+                'label'       => $p->label,
+                'duration'    => $p->duration,
+                'repetitions' => $p->repetitions,
+                'pause'       => $p->pause,
+                'cooldown'    => $p->cooldown,
+                'color'       => $p->color,
+            ])
+            ->all();
 
         if (isset($program->phases[$cursor->phaseIndex])) {
             $phase = $program->phases[$cursor->phaseIndex];
             $this->phaseLabel = $phase->label;
             $this->phaseColor = $phase->color;
-            $this->phaseReps = $phase->repetitions;
+            $this->phaseReps  = $phase->repetitions;
         }
     }
 
     private function loadHistory(): void
     {
-        $this->history = array_map(
-            static function (array $entry): array {
-                $entry['program_exists'] = Storage::exists("programs/{$entry['program_id']}.json");
-                return $entry;
-            },
-            array_map(
-                static fn(HistoryEntry $e) => $e->toArray(),
-                HistoryLog::all(),
-            ),
-        );
-    }
+        $entries = HistoryEntry::latest('completed_at')->limit(20)->get();
 
-    /**
-     * @throws JsonException
-     */
-    public function pause(): void
-    {
-        $runner = app(TimerRunner::class);
-        $this->rehydrateRunner($runner);
-        $runner->pause();
-        $this->syncCursor($runner->cursor(), TimerProgram::load($this->programId));
-    }
+        $existingIds = Program::whereIn('id', $entries->pluck('program_id')->filter())
+            ->pluck('id')
+            ->flip();
 
-    public function render(): View
-    {
-        return view('livewire.timer-screen');
-    }
-
-    public function repLabel(): string
-    {
-        if (in_array($this->state, [StateMachine::prepare, StateMachine::cooldown, StateMachine::completed], true)) {
-            return '';
-        }
-        return sprintf('%d / %d', $this->repIndex + 1, $this->phaseReps);
-    }
-
-    public function requestSettings(): void
-    {
-        $program = $this->programId ? TimerProgram::load($this->programId) : null;
-        $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, program: $program);
-    }
-
-    public function restart(): void
-    {
-        $runner = app(TimerRunner::class);
-        $program = TimerProgram::load($this->programId);
-        $this->programTotalDuration = $program->totalDuration();
-        $runner->load($program);
-        $this->syncCursor($runner->cursor(), $program);
-        $this->dispatch('topbar-title', title: config('app.name'));
-    }
-
-    /**
-     * @throws JsonException
-     */
-    public function resume(): void
-    {
-        $runner = app(TimerRunner::class);
-        $this->rehydrateRunner($runner);
-        $runner->resume();
-        $this->syncCursor($runner->cursor(), TimerProgram::load($this->programId));
-    }
-
-    public function segmentLabel(): string
-    {
-        return match ($this->state) {
-            StateMachine::prepare  => 'Get Ready',
-            StateMachine::pause    => 'Pause',
-            StateMachine::cooldown => 'Cooldown',
-            StateMachine::paused   => 'Paused',
-            StateMachine::completed => 'Complete!',
-            default => $this->phaseLabel,
-        };
-    }
-
-    public function start(): void
-    {
-        $runner = app(TimerRunner::class);
-        $program = TimerProgram::load($this->programId);
-
-        $this->programTotalDuration = $program->totalDuration();
-        $runner->load($program);
-
-        $runner->start();
-        $this->syncCursor($runner->cursor(), $program);
-
-        // EDGE top bar → program name
-        $this->dispatch('topbar-title', title: $this->programName);
-    }
-
-    /** Called every second from JS setInterval via wire:poll equivalent.
-     * @throws JsonException
-     */
-    public function tick(): void
-    {
-        $runner = app(TimerRunner::class);
-        $this->rehydrateRunner($runner);
-
-        if (!$runner->cursor()->isActive()) {
-            return;
-        }
-
-        $runner->tick();
-        $cursor = $runner->cursor();
-        $program = TimerProgram::load($this->programId);
-
-        $this->syncCursor($cursor, $program);
-
-        if ($cursor->isCompleted()) {
-            Log::info('Completed!');
-            $this->dispatch('playEndSound', sound: $this->endSound);
-            $this->dispatch('topbar-title', title: config('app.name'));
-        }
+        $this->history = $entries
+            ->map(fn(HistoryEntry $e) => [
+                'program_id'     => $e->program_id,
+                'program_name'   => $e->program_name,
+                'completed_at'   => $e->completed_at->toISOString(),
+                'total_duration' => $e->total_duration,
+                'program_exists' => $e->program_id !== null && $existingIds->has($e->program_id),
+            ])
+            ->all();
     }
 }
