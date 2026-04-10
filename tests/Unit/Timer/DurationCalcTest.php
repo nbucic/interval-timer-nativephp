@@ -2,24 +2,29 @@
 
 declare(strict_types=1);
 
-use App\Models\Program;
+use App\Timer\Phase;
+use App\Timer\TimerProgram;
+use Illuminate\Support\Facades\Storage;
 
 // Helper: build a program with given phases without touching Storage
-function makeProgram(array $phaseDefs): Program
+function makeProgram(array $phaseDefs): TimerProgram
 {
-    $prog = Program::create(['name' => 'Test']);
-    foreach ($phaseDefs as $i => $def) {
-        $prog->phases()->create(array_merge(['sort_order' => $i], $def));
-    }
+    Storage::fake();
 
-    return $prog->load('phases');
+    $prog = TimerProgram::create('Test');
+    foreach ($phaseDefs as $def) {
+        $prog->addPhase(new Phase(...$def));
+    }
+    $prog->save();
+
+    return TimerProgram::load($prog->id);
 }
 
 // ── Formula: (duration×reps) + (pause×(reps-1)) + cooldown ──────────────────
 
 test('single phase no pause no cooldown', function (): void {
     $prog = makeProgram([
-        ['label' => 'Work', 'duration' => 30, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#3b82f6'],
+        ['Work', 30, 1, 0, 0, '#3b82f6'],
     ]);
     expect($prog->totalDuration())->toBe(30);
 });
@@ -45,7 +50,7 @@ test('cooldown is added once after final rep', function (): void {
     $prog = makeProgram([
         ['label' => 'Work', 'duration' => 10, 'repetitions' => 2, 'pause' => 5, 'cooldown' => 8, 'color' => '#3b82f6'],
     ]);
-    expect($prog->totalDuration())->toBe(25);
+    expect($prog->totalDuration())->toBe(33);
 });
 
 test('multiple phases summed correctly', function (): void {
@@ -58,12 +63,15 @@ test('multiple phases summed correctly', function (): void {
         ['label' => 'Work',   'duration' => 10, 'repetitions' => 3, 'pause' => 5,  'cooldown' => 0,  'color' => '#3b82f6'],
         ['label' => 'Cool',   'duration' => 20, 'repetitions' => 1, 'pause' => 0,  'cooldown' => 10, 'color' => '#6b7280'],
     ]);
-    expect($prog->totalDuration())->toBe(90);
+    expect($prog->totalDuration())->toBe(100);
 });
 
 test('zero-duration program returns zero', function (): void {
-    $prog = Program::create(['name' => 'Empty']);
-    expect($prog->totalDuration())->toBe(0);
+    Storage::fake();
+    $prog = TimerProgram::create('Empty');
+    $prog->save();
+    $loaded = TimerProgram::load($prog->id);
+    expect($loaded->totalDuration())->toBe(0);
 });
 
 // ── formattedDuration ─────────────────────────────────────────────────────────

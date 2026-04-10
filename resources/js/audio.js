@@ -45,13 +45,6 @@ export function initAudio(volume = 0.8) {
     /** Single countdown beep (800 Hz, 100 ms). */
     function beep() { tone(800, 100); }
 
-    /** Prepare-phase beep — three rapid beeps at the same tone (800 Hz, 100 ms × 3). */
-    function prepareBeep() {
-        tone(800, 100, 0);
-        tone(800, 100, 150);
-        tone(800, 100, 300);
-    }
-
     /** Gentle single beep on user pause (600 Hz, 80 ms). */
     function pauseBeep() { tone(600, 80); }
 
@@ -106,7 +99,6 @@ export function initAudio(volume = 0.8) {
 
     return {
         beep,
-        prepareBeep,
         pauseBeep,
         tripleBeep,
         chime,
