@@ -1,5 +1,7 @@
 <?php
 
+$versionData = json_decode(file_get_contents(base_path('version.json')), true) ?? [];
+
 return [
 
     /*
@@ -13,7 +15,7 @@ return [
     |
     */
 
-    'version' => env('NATIVEPHP_APP_VERSION', '1.0.0'),
+    'version' => $versionData['version'] ?? env('NATIVEPHP_APP_VERSION', '1.0.0'),
 
     /*
     |--------------------------------------------------------------------------
@@ -26,7 +28,7 @@ return [
     |
     */
 
-    'version_code' => env('NATIVEPHP_APP_VERSION_CODE', 1),
+    'version_code' => $versionData['version_code'] ?? env('NATIVEPHP_APP_VERSION_CODE', 1),
 
     /*
     |--------------------------------------------------------------------------
@@ -129,6 +131,7 @@ return [
         'storage/framework/cache',
         'storage/framework/testing',
         'storage/logs/laravel.log',
+        'public/hot',
     ],
 
     /*

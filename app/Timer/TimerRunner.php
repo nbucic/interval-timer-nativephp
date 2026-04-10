@@ -7,6 +7,9 @@ namespace App\Timer;
 use App\Enum\StateMachine;
 use App\Events\PhaseChanged;
 use App\Events\ProgramCompleted;
+use App\Jobs\WriteHistoryEntry;
+use App\Models\Phase;
+use App\Models\Program;
 use Closure;
 use RuntimeException;
 
@@ -36,7 +39,9 @@ use RuntimeException;
  */
 class TimerRunner
 {
-    private ?TimerProgram $program = null;
+    private const PREPARE_SECONDS = 5;
+
+    private ?Program $program = null;
     public TimerCursor $cursor {
         set {
             $this->cursor = $value;
@@ -72,16 +77,10 @@ class TimerRunner
         $this->cursor = TimerCursor::idle();
     }
 
-    public function isRunning(): bool
-    {
-        return $this->cursor->isRunning();
-    }
-
     /** Load a program and reset the cursor to idle. */
-    public function load(TimerProgram $program): void
+    public function load(Program $program): void
     {
         $this->program = $program;
-
         $this->cursor = TimerCursor::idle();
     }
 
@@ -102,10 +101,14 @@ class TimerRunner
         $this->onTick = $fn;
     }
 
-    /** User-initiated pause (or PhoneStateListener). */
+    /** User-initiated pause (or PhoneStateListener). Cannot pause during prepare. */
     public function pause(): void
     {
         if (!$this->cursor->isActive()) {
+            return;
+        }
+
+        if ($this->cursor->state === StateMachine::prepare) {
             return;
         }
 
@@ -122,7 +125,7 @@ class TimerRunner
         }
     }
 
-    public function program(): ?TimerProgram
+    public function program(): ?Program
     {
         return $this->program;
     }
@@ -140,7 +143,7 @@ class TimerRunner
         $this->notifyTick();
     }
 
-    /** Start the timer from idle. */
+    /** Start the timer from idle — enters a 5-second PREPARE countdown first. */
     public function start(): void
     {
         $this->assertProgramLoaded();
@@ -151,6 +154,12 @@ class TimerRunner
             );
         }
 
+        $this->cursor = $this->cursor->enterPrepare(self::PREPARE_SECONDS);
+    }
+
+    /** Transition from prepare → running, initialising the first rep. */
+    private function beginFirstRep(): void
+    {
         $phase = $this->currentPhase();
         $totalRemaining = $this->program->totalDuration();
 
@@ -163,6 +172,7 @@ class TimerRunner
         );
 
         PhaseChanged::dispatch($this->program->id, 0, $phase, 0);
+        $this->notifyTick();
     }
 
     private function assertProgramLoaded(): void
@@ -170,7 +180,7 @@ class TimerRunner
         if ($this->program === null) {
             throw new RuntimeException('No program loaded. Call load() first.');
         }
-        if (count($this->program->phases) === 0) {
+        if ($this->program->phases->isEmpty()) {
             throw new RuntimeException('Program has no phases.');
         }
     }
@@ -184,15 +194,14 @@ class TimerRunner
 
     private function currentPhase(): Phase
     {
-        // PHP 8.5: array_first_value($this->phases())
-        return ($this->phases()[0] ?? null)
+        return array_first($this->phases())
             ?? throw new RuntimeException('Program has no phases.');
     }
 
     /** @return Phase[] */
     private function phases(): array
     {
-        return $this->program->phases;
+        return $this->program->phases->all();
     }
 
     /**
@@ -206,6 +215,18 @@ class TimerRunner
         }
 
         $cursor = $this->cursor->tick();
+
+        // Prepare: beep every second (bypass lead-in logic), transition when done
+        if ($cursor->state === StateMachine::prepare) {
+            if ($cursor->remaining > 0) {
+                $this->fireBeep('prepare');
+                $this->cursor = $cursor;
+                $this->notifyTick();
+            } else {
+                $this->beginFirstRep();
+            }
+            return;
+        }
 
         if ($this->shouldBeep($cursor)) {
             $this->fireBeep('countdown');
@@ -224,7 +245,7 @@ class TimerRunner
 
     /**
      * True when the cursor's remaining falls within the lead-in countdown window.
-     * Uses beepLeadIn->value to extract the int from the BeepLeadIn backed enum.
+     * Uses beep_lead_in->value to extract the int from the BeepLeadIn backed enum.
      */
     private function shouldBeep(TimerCursor $cursor): bool
     {
@@ -232,7 +253,7 @@ class TimerRunner
             return false;
         }
 
-        $leadIn = $this->program->beepLeadIn->value;  // BeepLeadIn: int enum
+        $leadIn = $this->program->beep_lead_in->value;
         $segmentTotal = $this->segmentDurationForCursor($cursor);
         $effectiveLead = ($segmentTotal < $leadIn) ? max(1, $segmentTotal - 1) : $leadIn;
 
@@ -244,10 +265,11 @@ class TimerRunner
         $phase = $this->phases()[$cursor->phaseIndex];
 
         return match ($cursor->state) {
-            StateMachine::running => $phase->duration,
-            StateMachine::pause => $phase->pause,
+            StateMachine::prepare  => self::PREPARE_SECONDS,
+            StateMachine::running  => $phase->duration,
+            StateMachine::pause    => $phase->pause,
             StateMachine::cooldown => $phase->cooldown,
-            default => 0,
+            default                => 0,
         };
     }
 
@@ -355,10 +377,19 @@ class TimerRunner
     {
         $this->cursor = $this->cursor->complete();
 
+        $totalDuration = $this->program->totalDuration();
+
         ProgramCompleted::dispatch(
             $this->program->id,
-            $this->program->endSound,
-            $this->program->totalDuration(),
+            $this->program->end_sound,
+            $totalDuration,
+        );
+
+        WriteHistoryEntry::dispatch(
+            $this->program->id,
+            $this->program->name,
+            now()->toISOString(),
+            $totalDuration,
         );
 
         $this->program->touch();

@@ -4,24 +4,20 @@ declare(strict_types=1);
 
 use App\Enum\StateMachine;
 use App\Events\ProgramCompleted;
-use App\Timer\Phase;
-use App\Timer\TimerProgram;
+use App\Models\Program;
 use App\Timer\TimerRunner;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Storage;
 
 // ── Pause resumes from exact position ────────────────────────────────────────
 
 test('pause preserves exact remaining seconds and resumes correctly', function (): void {
-    Storage::fake();
-
-    $prog = TimerProgram::create('Lifecycle');
-    $prog->addPhase(new Phase('Work', 20, 1, 0, 0, '#3b82f6'));
-    $prog->save();
+    $prog = Program::create(['name' => 'Lifecycle']);
+    $prog->phases()->create(['label' => 'Work', 'duration' => 20, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#3b82f6', 'sort_order' => 0]);
 
     $runner = new TimerRunner();
-    $runner->load(TimerProgram::load($prog->id));
+    $runner->load($prog);
     $runner->start();
+    for ($i = 0; $i < 5; $i++) $runner->tick(); // skip prepare
 
     // Run 7 seconds → 13 remaining
     for ($i = 0; $i < 7; $i++) $runner->tick();
@@ -42,15 +38,13 @@ test('pause preserves exact remaining seconds and resumes correctly', function (
 // ── Pause mid-pause-segment ────────────────────────────────────────────────────
 
 test('user can pause during inter-rep pause and resume to pause state', function (): void {
-    Storage::fake();
-
-    $prog = TimerProgram::create('Mid-pause test');
-    $prog->addPhase(new Phase('Work', 5, 2, 10, 0, '#3b82f6'));
-    $prog->save();
+    $prog = Program::create(['name' => 'Mid-pause test']);
+    $prog->phases()->create(['label' => 'Work', 'duration' => 5, 'repetitions' => 2, 'pause' => 10, 'cooldown' => 0, 'color' => '#3b82f6', 'sort_order' => 0]);
 
     $runner = new TimerRunner();
-    $runner->load(TimerProgram::load($prog->id));
+    $runner->load($prog);
     $runner->start();
+    for ($i = 0; $i < 5; $i++) $runner->tick(); // skip prepare
 
     // Finish rep 1 (5 ticks) → enter pause
     for ($i = 0; $i < 5; $i++) $runner->tick();
@@ -73,15 +67,13 @@ test('user can pause during inter-rep pause and resume to pause state', function
 // ── Discard → no history / no event ──────────────────────────────────────────
 
 test('discard does not dispatch ProgramCompleted', function (): void {
-    Storage::fake();
     Event::fake([ProgramCompleted::class]);
 
-    $prog = TimerProgram::create('Kill test');
-    $prog->addPhase(new Phase('Work', 30, 1, 0, 0, '#3b82f6'));
-    $prog->save();
+    $prog = Program::create(['name' => 'Kill test']);
+    $prog->phases()->create(['label' => 'Work', 'duration' => 30, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#3b82f6', 'sort_order' => 0]);
 
     $runner = new TimerRunner();
-    $runner->load(TimerProgram::load($prog->id));
+    $runner->load($prog);
     $runner->start();
     for ($i = 0; $i < 15; $i++) $runner->tick(); // half-way
     $runner->discard();
@@ -94,32 +86,27 @@ test('discard does not dispatch ProgramCompleted', function (): void {
 // ── last_used_at updated on completion only ────────────────────────────────────
 
 test('last_used_at is null before program completes', function (): void {
-    Storage::fake();
-
-    $prog = TimerProgram::create('No touch yet');
-    $prog->addPhase(new Phase('Work', 5, 1, 0, 0, '#3b82f6'));
-    $prog->save();
+    $prog = Program::create(['name' => 'No touch yet']);
+    $prog->phases()->create(['label' => 'Work', 'duration' => 5, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#3b82f6', 'sort_order' => 0]);
 
     $runner = new TimerRunner();
-    $runner->load(TimerProgram::load($prog->id));
+    $runner->load($prog);
     $runner->start();
     for ($i = 0; $i < 3; $i++) $runner->tick(); // not done yet
 
-    expect(TimerProgram::load($prog->id)->lastUsedAt)->toBeNull();
+    expect(Program::find($prog->id)->last_used_at)->toBeNull();
 });
 
 test('last_used_at is set after program completes', function (): void {
-    Storage::fake();
-
-    $prog = TimerProgram::create('Touch on complete');
-    $prog->addPhase(new Phase('Work', 3, 1, 0, 0, '#3b82f6'));
-    $prog->save();
+    $prog = Program::create(['name' => 'Touch on complete']);
+    $prog->phases()->create(['label' => 'Work', 'duration' => 3, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#3b82f6', 'sort_order' => 0]);
 
     $runner = new TimerRunner();
-    $runner->load(TimerProgram::load($prog->id));
+    $runner->load($prog);
     $runner->start();
+    for ($i = 0; $i < 5; $i++) $runner->tick(); // skip prepare
     for ($i = 0; $i < 3; $i++) $runner->tick();
 
     expect($runner->cursor()->isCompleted())->toBeTrue();
-    expect(TimerProgram::load($prog->id)->lastUsedAt)->not->toBeNull();
+    expect(Program::find($prog->id)->last_used_at)->not->toBeNull();
 });

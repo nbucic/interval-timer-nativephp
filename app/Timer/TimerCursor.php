@@ -78,10 +78,28 @@ readonly class TimerCursor
         );
     }
 
+    /** Enter the pre-start countdown before the first rep. */
+    public function enterPrepare(int $seconds): self
+    {
+        return clone($this, [
+                'phaseIndex'     => 0,
+                'repIndex'       => 0,
+                'state'          => StateMachine::prepare,
+                'remaining'      => $seconds,
+                'totalRemaining' => $this->totalRemaining,
+            ]
+        );
+    }
+
     /** True whenever the timer is actively counting down (not user-paused, not idle). */
     public function isActive(): bool
     {
-        return in_array($this->state, [StateMachine::running, StateMachine::pause, StateMachine::cooldown], true);
+        return in_array($this->state, [
+            StateMachine::prepare,
+            StateMachine::running,
+            StateMachine::pause,
+            StateMachine::cooldown,
+        ], true);
     }
 
     public function isCompleted(): bool
@@ -109,11 +127,6 @@ readonly class TimerCursor
     public function isPaused(): bool
     {
         return $this->state === StateMachine::paused;
-    }
-
-    public function isRunning(): bool
-    {
-        return $this->state === StateMachine::running;
     }
 
     /** Advance to the first rep of the next phase. */

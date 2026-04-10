@@ -247,13 +247,24 @@
                             </div>
                         @endif
                         <div class="{{ $phaseReps > 1 ? '' : 'col-span-2' }}">
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                            <label class="block text-xs font-semibold uppercase tracking-wider mb-1.5
+                                          {{ $this->editingIsLastPhase() ? 'text-gray-600' : 'text-gray-400' }}">
                                 Cooldown (sec)
                             </label>
-                            <p class="text-gray-600 text-[10px] mb-1">After final rep</p>
+                            <p class="text-[10px] mb-1 {{ $this->editingIsLastPhase() ? 'text-gray-700' : 'text-gray-600' }}">
+                                @if($this->editingIsLastPhase())
+                                    not counted — add another phase
+                                @else
+                                    After final rep
+                                @endif
+                            </p>
                             <input type="number" wire:model="phaseCooldown" min="0" max="3600"
-                                   class="w-full bg-gray-800 text-white rounded-xl px-4 py-3
-                                      border border-white/10 focus:border-blue-500 focus:outline-none text-center text-lg font-bold">
+                                   @if($this->editingIsLastPhase()) disabled @endif
+                                   class="w-full rounded-xl px-4 py-3 border text-center text-lg font-bold
+                                          focus:outline-none transition-colors
+                                          {{ $this->editingIsLastPhase()
+                                              ? 'bg-gray-800/40 text-gray-600 border-white/5 cursor-not-allowed'
+                                              : 'bg-gray-800 text-white border-white/10 focus:border-blue-500' }}">
                         </div>
                     </div>
 
