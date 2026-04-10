@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
-use App\Timer\AppSettings;
-use App\Timer\Phase;
-use App\Timer\TimerProgram;
+use App\Enum\BeepLeadIn;
+use App\Models\Program;
+use App\Models\Setting;
+use Illuminate\Validation\Rules\Enum;
+use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -16,26 +18,26 @@ use Livewire\Component;
 class ProgramEditor extends Component
 {
     // ── Program fields ────────────────────────────────────────────────────
-    public string $programId  = '';
-    public string $name       = '';
-    public int    $beepLeadIn = 3;
-    public string $endSound   = 'triple';
+    public string $programId = '';
+    public string $name = '';
+    public BeepLeadIn $beepLeadIn = BeepLeadIn::Three;
+    public string $endSound = 'triple';
 
     // ── Phase form fields (for the active add/edit panel) ─────────────────
-    public ?int    $editingPhaseIndex = null;  // null = adding new
-    public string  $phaseLabel        = '';
-    public int     $phaseDuration     = 30;
-    public int     $phaseReps         = 1;
-    public int     $phasePause        = 0;
-    public int     $phaseCooldown     = 0;
-    public string  $phaseColor        = '#3b82f6';
+    public ?int $editingPhaseIndex = null;  // null = adding new
+    public string $phaseLabel = '';
+    public int $phaseDuration = 30;
+    public int $phaseReps = 1;
+    public int $phasePause = 0;
+    public int $phaseCooldown = 0;
+    public string $phaseColor = '#3b82f6';
 
-    public bool    $showPhaseForm = false;
+    public bool $showPhaseForm = false;
 
-    /** @var array[] Raw phase arrays (toArray) for display, mutated in-place */
+    /** @var array[] Raw phase arrays for display, mutated in-place */
     public array $phases = [];
 
-    // Colour palette for quick-pick
+    // Color palette for quick-pick
     public array $palette = [
         '#3b82f6', // blue
         '#22c55e', // green
@@ -50,24 +52,67 @@ class ProgramEditor extends Component
     public function mount(string $id): void
     {
         if ($id === 'create') {
-            // New program with defaults from settings
-            $settings = AppSettings::load();
-            $this->beepLeadIn = $settings->defaultBeepLeadIn;
-            $this->endSound   = $settings->defaultEndSound;
+            $settings = Setting::current();
+            $this->beepLeadIn = $settings->default_beep_lead_in;
+            $this->endSound   = $settings->default_end_sound;
         } else {
-            $program          = TimerProgram::load($id);
-            $this->programId  = $program->id;
-            $this->name       = $program->name;
-            $this->beepLeadIn = $program->beepLeadIn;
-            $this->endSound   = $program->endSound;
-            $this->phases     = array_map(
-                static fn (Phase $p) => $p->toArray(),
-                $program->phases,
-            );
+            $program = Program::with('phases')->findOrFail($id);
+            $this->programId = $program->id;
+            $this->name      = $program->name;
+            $this->beepLeadIn = $program->beep_lead_in;
+            $this->endSound   = $program->end_sound;
+            $this->phases = $program->phases
+                ->map(fn($p) => [
+                    'label'       => $p->label,
+                    'duration'    => $p->duration,
+                    'repetitions' => $p->repetitions,
+                    'pause'       => $p->pause,
+                    'cooldown'    => $p->cooldown,
+                    'color'       => $p->color,
+                ])
+                ->all();
         }
     }
 
     // ── Phase form ────────────────────────────────────────────────────────
+
+    public function cancelPhaseForm(): void
+    {
+        $this->showPhaseForm = false;
+        $this->resetPhaseForm();
+    }
+
+    public function deletePhase(int $index): void
+    {
+        array_splice($this->phases, $index, 1);
+    }
+
+    public function editPhase(int $index): void
+    {
+        $p = $this->phases[$index];
+        $this->phaseLabel    = $p['label'];
+        $this->phaseDuration = $p['duration'];
+        $this->phaseReps     = $p['repetitions'];
+        $this->phasePause    = $p['pause'];
+        $this->phaseCooldown = $p['cooldown'];
+        $this->phaseColor    = $p['color'];
+        $this->editingPhaseIndex = $index;
+        $this->showPhaseForm = true;
+    }
+
+    public function movePhaseDown(int $index): void
+    {
+        if ($index >= count($this->phases) - 1) return;
+        [$this->phases[$index], $this->phases[$index + 1]] =
+            [$this->phases[$index + 1], $this->phases[$index]];
+    }
+
+    public function movePhaseUp(int $index): void
+    {
+        if ($index <= 0) return;
+        [$this->phases[$index - 1], $this->phases[$index]] =
+            [$this->phases[$index], $this->phases[$index - 1]];
+    }
 
     public function openAddPhase(): void
     {
@@ -76,20 +121,7 @@ class ProgramEditor extends Component
         }
         $this->resetPhaseForm();
         $this->editingPhaseIndex = null;
-        $this->showPhaseForm     = true;
-    }
-
-    public function editPhase(int $index): void
-    {
-        $p = $this->phases[$index];
-        $this->phaseLabel     = $p['label'];
-        $this->phaseDuration  = $p['duration'];
-        $this->phaseReps      = $p['repetitions'];
-        $this->phasePause     = $p['pause'];
-        $this->phaseCooldown  = $p['cooldown'];
-        $this->phaseColor     = $p['color'];
-        $this->editingPhaseIndex = $index;
-        $this->showPhaseForm  = true;
+        $this->showPhaseForm = true;
     }
 
     public function savePhase(): void
@@ -101,6 +133,10 @@ class ProgramEditor extends Component
             'phasePause'    => 'required|integer|min:0|max:3600',
             'phaseCooldown' => 'required|integer|min:0|max:3600',
         ]);
+
+        if ($this->phaseReps === 1) {
+            $this->phasePause = 0;
+        }
 
         $phaseArray = [
             'label'       => trim($this->phaseLabel),
@@ -121,62 +157,63 @@ class ProgramEditor extends Component
         $this->resetPhaseForm();
     }
 
-    public function deletePhase(int $index): void
+    public function savePhaseAndAddNew(): void
     {
-        array_splice($this->phases, $index, 1);
+        $this->savePhase();
+        $this->editingPhaseIndex = null;
+        $this->showPhaseForm = true;
     }
 
-    public function movePhaseUp(int $index): void
-    {
-        if ($index <= 0) return;
-        [$this->phases[$index - 1], $this->phases[$index]] =
-            [$this->phases[$index], $this->phases[$index - 1]];
-    }
-
-    public function movePhaseDown(int $index): void
-    {
-        if ($index >= count($this->phases) - 1) return;
-        [$this->phases[$index], $this->phases[$index + 1]] =
-            [$this->phases[$index + 1], $this->phases[$index]];
-    }
-
-    public function cancelPhaseForm(): void
-    {
-        $this->showPhaseForm = false;
-        $this->resetPhaseForm();
-    }
-
-    // ── Program save/delete ───────────────────────────────────────────────
+    // ── Program save ──────────────────────────────────────────────────────
 
     public function saveProgram(): void
     {
         $this->validate([
             'name'       => 'required|string|max:60',
-            'beepLeadIn' => 'required|in:3,5',
+            'beepLeadIn' => ['required', new Enum(BeepLeadIn::class)],
             'endSound'   => 'required|in:triple,chime',
         ]);
 
         if ($this->programId === '') {
-            $program             = TimerProgram::create($this->name);
-            $this->programId     = $program->id;
+            $settings = Setting::current();
+            $program = Program::create([
+                'name'         => $this->name,
+                'beep_lead_in' => $settings->default_beep_lead_in,
+                'end_sound'    => $settings->default_end_sound,
+            ]);
+            $this->programId = $program->id;
         } else {
-            $program             = TimerProgram::load($this->programId);
-            $program->name       = $this->name;
+            $program = Program::findOrFail($this->programId);
+            $program->name = $this->name;
         }
 
-        $program->beepLeadIn = $this->beepLeadIn;
-        $program->endSound   = $this->endSound;
-        $program->phases     = array_map(
-            static fn (array $p) => Phase::fromArray($p),
-            $this->phases,
-        );
-
+        $program->beep_lead_in = $this->beepLeadIn;
+        $program->end_sound    = $this->endSound;
         $program->save();
 
-        $this->redirect("/timer/{$program->id}", navigate: true);
+        $program->phases()->delete();
+        foreach ($this->phases as $index => $phaseData) {
+            $program->phases()->create([
+                'sort_order'  => $index,
+                'label'       => $phaseData['label'],
+                'duration'    => (int) $phaseData['duration'],
+                'repetitions' => (int) $phaseData['repetitions'],
+                'pause'       => (int) $phaseData['pause'],
+                'cooldown'    => (int) $phaseData['cooldown'],
+                'color'       => $phaseData['color'],
+            ]);
+        }
+
+        $this->redirect("/timer/$program->id");
     }
 
     // ── Computed ─────────────────────────────────────────────────────────
+
+    public function formattedDuration(): string
+    {
+        $total = $this->totalDuration();
+        return sprintf('%d:%02d', intdiv($total, 60), $total % 60);
+    }
 
     public function totalDuration(): int
     {
@@ -191,13 +228,24 @@ class ProgramEditor extends Component
         );
     }
 
-    public function formattedDuration(): string
+    /**
+     * True when the phase form is open for the last phase in the list
+     * (or for a new phase that will become the last).
+     * Used in the view to grey out the cooldown field.
+     */
+    public function editingIsLastPhase(): bool
     {
-        $total = $this->totalDuration();
-        return sprintf('%d:%02d', intdiv($total, 60), $total % 60);
+        $count = count($this->phases);
+        if ($count === 0) {
+            return true;
+        }
+        if ($this->editingPhaseIndex === null) {
+            return true;
+        }
+        return $this->editingPhaseIndex === $count - 1;
     }
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         return view('livewire.program-editor');
     }
@@ -208,7 +256,7 @@ class ProgramEditor extends Component
     {
         $this->phaseLabel    = '';
         $this->phaseDuration = 30;
-        $this->phaseReps     = 1;
+        $this->phaseReps     = 3;
         $this->phasePause    = 0;
         $this->phaseCooldown = 0;
         $this->phaseColor    = '#3b82f6';

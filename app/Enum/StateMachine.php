@@ -5,6 +5,7 @@ namespace App\Enum;
 enum StateMachine: string
 {
 case idle = 'IDLE';
+case prepare = 'PREPARE';
 case running = 'RUNNING';
 case paused = 'PAUSED';
 case pause = 'PAUSE';

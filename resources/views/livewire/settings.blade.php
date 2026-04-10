@@ -1,3 +1,4 @@
+@php use App\Enum\BeepLeadIn; @endphp
 <div class="flex flex-col h-full">
 
     <div class="flex items-center justify-between px-4 py-4">
@@ -91,12 +92,12 @@
                         <button
                             wire:click="$set('defaultBeepLeadIn', 3)"
                             class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors
-                                   {{ $defaultBeepLeadIn === 3 ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400' }}"
+                                   {{ $defaultBeepLeadIn === BeepLeadIn::Three ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400' }}"
                         >3s</button>
                         <button
                             wire:click="$set('defaultBeepLeadIn', 5)"
                             class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors
-                                   {{ $defaultBeepLeadIn === 5 ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400' }}"
+                                   {{ $defaultBeepLeadIn === BeepLeadIn::Five ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400' }}"
                         >5s</button>
                     </div>
                 </div>
@@ -151,7 +152,7 @@
         <section>
             <div class="bg-gray-900 rounded-2xl border border-white/5 px-4 py-4">
                 <p class="text-gray-500 text-xs">
-                    Interval Timer · Built with NativePHP Mobile {{ app('nativephp.version', '3.x') }}
+                    Interval Timer · Built with NativePHP Mobile {{ config('nativephp.version', '3.1') }}
                     + Laravel {{ app()->version() }} + PHP 8.5
                 </p>
             </div>

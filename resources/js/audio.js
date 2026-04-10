@@ -1,15 +1,17 @@
+// noinspection JSUnresolvedReference
+
 /**
  * Audio engine for the interval timer.
  *
- * soundMode = 'beep'  → Web Audio API (synthesised, no network)
+ * soundMode = 'beep' → Web Audio API (synthesized, no network)
  * soundMode = 'voice' → Android TTS via NativePHP JS bridge (feminine, calm)
  *
  * All methods are no-ops until the user has interacted with the page,
  * satisfying the browser AudioContext autoplay policy.
  */
-export function initAudio() {
+export function initAudio(volume = 0.8) {
+    volume = Math.max(0, Math.min(1, volume));
     let ctx = null;
-    let volume = 0.8;
 
     function getCtx() {
         if (!ctx) {
@@ -43,12 +45,19 @@ export function initAudio() {
     /** Single countdown beep (800 Hz, 100 ms). */
     function beep() { tone(800, 100); }
 
+    /** Prepare-phase beep — three rapid beeps at the same tone (800 Hz, 100 ms × 3). */
+    function prepareBeep() {
+        tone(800, 100, 0);
+        tone(800, 100, 150);
+        tone(800, 100, 300);
+    }
+
     /** Gentle single beep on user pause (600 Hz, 80 ms). */
     function pauseBeep() { tone(600, 80); }
 
     /**
      * End sound: triple beep (three 880 Hz tones 150 ms apart).
-     * finish-triple.mp3 semantics, synthesised.
+     * finish-triple.mp3 semantics, synthesized.
      */
     function tripleBeep() {
         tone(880, 120, 0);
@@ -58,7 +67,7 @@ export function initAudio() {
 
     /**
      * End sound: chime (descending 3-tone chord, warm).
-     * finish-chime.mp3 semantics, synthesised.
+     * finish-chime.mp3 semantics, synthesized.
      */
     function chime() {
         tone(1046.5, 300, 0);    // C6
@@ -68,7 +77,7 @@ export function initAudio() {
 
     /**
      * Android TTS via NativePHP bridge.
-     * Falls back to Web Speech API on web browser.
+     * Falls back to Web Speech API on a web browser.
      */
     function speak(text) {
         if (window.NativePhp?.tts?.speak) {
@@ -97,10 +106,10 @@ export function initAudio() {
 
     return {
         beep,
+        prepareBeep,
         pauseBeep,
         tripleBeep,
         chime,
         speak,
-        setVolume(v) { volume = Math.max(0, Math.min(1, v)); },
     };
 }

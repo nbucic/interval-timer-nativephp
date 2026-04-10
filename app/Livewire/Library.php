@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
-use App\Timer\TimerProgram;
+use App\Models\Program;
+use App\Models\Setting;
+use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -16,7 +18,6 @@ class Library extends Component
     public string $newName = '';
     public bool   $showCreate = false;
 
-    /** @var TimerProgram[] */
     public array $programs = [];
 
     public function mount(): void
@@ -26,12 +27,15 @@ class Library extends Component
 
     public function loadPrograms(): void
     {
-        $this->programs = TimerProgram::all();
+        $this->programs = Program::with('phases')
+            ->orderByRaw('COALESCE(last_used_at, created_at) DESC')
+            ->get()
+            ->toArray();
     }
 
     public function openCreate(): void
     {
-        $this->newName   = '';
+        $this->newName    = '';
         $this->showCreate = true;
     }
 
@@ -45,27 +49,27 @@ class Library extends Component
     {
         $this->validate(['newName' => 'required|string|max:60']);
 
-        $program = TimerProgram::create(trim($this->newName));
-        $program->save();
+        $settings = Setting::current();
+
+        $program = Program::create([
+            'name'         => trim($this->newName),
+            'beep_lead_in' => $settings->default_beep_lead_in,
+            'end_sound'    => $settings->default_end_sound,
+        ]);
 
         $this->showCreate = false;
         $this->newName    = '';
 
-        $this->redirect("/programs/{$program->id}/edit", navigate: true);
+        $this->redirect("/programs/$program->id/edit");
     }
 
     public function deleteProgram(string $id): void
     {
-        try {
-            $program = TimerProgram::load($id);
-            $program->delete();
-        } catch (\RuntimeException) {
-            // Already gone — ignore.
-        }
+        Program::find($id)?->delete();
         $this->loadPrograms();
     }
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         return view('livewire.library');
     }
