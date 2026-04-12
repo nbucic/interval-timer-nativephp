@@ -77,7 +77,9 @@ class Program extends Model
             0,
         );
 
-        return $total - (array_last($phases)?->cooldown ?? 0);
+        $lastPhase = $phases[count($phases) - 1] ?? null;
+
+        return $total - ($lastPhase?->cooldown ?? 0);
     }
 
     public function getTotalDurationAttribute(): int

@@ -194,7 +194,7 @@ class TimerRunner
 
     private function currentPhase(): Phase
     {
-        return array_first($this->phases())
+        return $this->phases()[0]
             ?? throw new RuntimeException('Program has no phases.');
     }
 
