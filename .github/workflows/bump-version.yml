@@ -2,7 +2,8 @@ name: Bump Version
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   bump:
