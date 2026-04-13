@@ -43,6 +43,7 @@ class TimerScreen extends Component
     public string $soundMode = 'beep';
     public float $volume = 0.8;
     public string $endSound = 'triple';
+    public bool $keepScreenOn = true;
 
     // ── Ring countdown ────────────────────────────────────────────────────
     public int $programTotalDuration = 0;
@@ -57,8 +58,9 @@ class TimerScreen extends Component
     public function mount(?string $id = null): void
     {
         $settings = Setting::current();
-        $this->soundMode = $settings->sound_mode;
-        $this->volume    = $settings->volume;
+        $this->soundMode    = $settings->sound_mode;
+        $this->volume       = $settings->volume;
+        $this->keepScreenOn = $settings->keep_screen_on;
 
         if ($id) {
             $this->loadProgram($id);
