@@ -4,7 +4,7 @@
  * Audio engine for the interval timer.
  *
  * soundMode = 'beep' → Web Audio API (synthesized, no network)
- * soundMode = 'voice' → Android TTS via NativePHP JS bridge (feminine, calm)
+ * soundMode = 'voice' → Android TTS via window.AndroidTTS bridge (TTSBridge.kt)
  *
  * All methods are no-ops until the user has interacted with the page,
  * satisfying the browser AudioContext autoplay policy.
@@ -76,31 +76,36 @@ export function initAudio(volume = 0.8) {
     }
 
     /**
-     * Android TTS via NativePHP bridge.
-     * Falls back to Web Speech API on a web browser.
+     * Speak text via Android TTS bridge (window.AndroidTTS) when running
+     * inside the NativePHP WebView, with a Web Speech API fallback for
+     * browser-based development.
      */
     function speak(text) {
-        if (window.NativePhp?.tts?.speak) {
-            // NativePHP Mobile TTS plugin (feminine, calm pitch)
-            window.NativePhp.tts.speak({
-                text,
-                voice: 'female',
-                pitch: 0.9,
-                rate: 0.85,
-            });
+        // Android bridge registered by TTSBridge.kt
+        if (window.AndroidTTS?.speak) {
+            window.AndroidTTS.speak(text);
             return;
         }
-        // Browser fallback
+        // Browser fallback — voices load asynchronously, so wait for them
         if ('speechSynthesis' in window) {
-            const utt    = new SpeechSynthesisUtterance(text);
-            utt.pitch    = 0.9;
-            utt.rate     = 0.85;
-            utt.volume   = volume;
-            const voices = speechSynthesis.getVoices();
-            const fem    = voices.find(v => v.name.toLowerCase().includes('female'))
-                        || voices.find(v => v.lang.startsWith('en'));
-            if (fem) utt.voice = fem;
-            speechSynthesis.speak(utt);
+            const utt = new SpeechSynthesisUtterance(text);
+            utt.pitch  = 0.9;
+            utt.rate   = 0.85;
+            utt.volume = volume;
+
+            const doSpeak = () => {
+                const voices = speechSynthesis.getVoices();
+                const voice  = voices.find(v => v.name.toLowerCase().includes('female'))
+                            || voices.find(v => v.lang.startsWith('en'));
+                if (voice) utt.voice = voice;
+                speechSynthesis.speak(utt);
+            };
+
+            if (speechSynthesis.getVoices().length > 0) {
+                doSpeak();
+            } else {
+                speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true });
+            }
         }
     }
 

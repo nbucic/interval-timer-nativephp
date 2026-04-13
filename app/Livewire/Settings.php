@@ -60,7 +60,7 @@ class Settings extends Component
 
         $settings->save();
 
-        $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, program: null);
+        $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, keepScreenOn: $this->keepScreenOn, program: null);
 
         $this->saved = true;
     }
