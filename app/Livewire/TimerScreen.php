@@ -128,6 +128,10 @@ class TimerScreen extends Component
         $runner  = app(TimerRunner::class);
         $program = Program::with('phases')->findOrFail($this->programId);
 
+        if ($program->phases->isEmpty()) {
+            return;
+        }
+
         $this->programTotalDuration = $program->totalDuration();
         $runner->load($program);
         $runner->start();

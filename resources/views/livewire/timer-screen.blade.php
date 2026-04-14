@@ -259,13 +259,20 @@
 
             {{-- Primary action --}}
             @if($state === StateMachine::idle)
-                <button
-                    wire:click="start"
-                    class="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold
-                   text-xl py-5 rounded-3xl transition-colors shadow-lg shadow-blue-900/40"
-                >
-                    Start
-                </button>
+                @if(count($phases) === 0)
+                    <div class="w-full text-center text-amber-400 text-sm font-medium py-4 px-4
+                                bg-amber-950/40 border border-amber-800/40 rounded-3xl">
+                        No phases — edit this program to add at least one phase before starting.
+                    </div>
+                @else
+                    <button
+                        wire:click="start"
+                        class="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold
+                       text-xl py-5 rounded-3xl transition-colors shadow-lg shadow-blue-900/40"
+                    >
+                        Start
+                    </button>
+                @endif
 
             @elseif($state === StateMachine::prepare)
                 {{-- No primary action during prepare — user just waits --}}
