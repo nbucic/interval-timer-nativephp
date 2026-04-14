@@ -217,7 +217,11 @@ class ProgramEditor extends Component
 
     public function totalDuration(): int
     {
-        return array_reduce(
+        if (empty($this->phases)) {
+            return 0;
+        }
+
+        $total = array_reduce(
             $this->phases,
             static function (int $carry, array $p): int {
                 $repTime = $p['duration'] * $p['repetitions'];
@@ -226,6 +230,9 @@ class ProgramEditor extends Component
             },
             0,
         );
+
+        // The last phase's cooldown is never executed (timer goes straight to COMPLETED).
+        return $total - (int) ($this->phases[array_key_last($this->phases)]['cooldown'] ?? 0);
     }
 
     /**
