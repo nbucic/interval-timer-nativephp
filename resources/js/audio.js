@@ -81,30 +81,43 @@ export function initAudio(volume = 0.8) {
      * TTSBridge.kt) when running inside the NativePHP WebView.
      *
      * Falls back to Web Speech API for browser-based development.
-     * Speaks immediately without waiting for voiceschanged -- on Android WebView
-     * that event may never fire, so we use whatever voices are already loaded
-     * (the default voice is fine if none are found).
+     * Logs every decision point so the full chain is visible in both
+     * Android Logcat (via WebChromeClient console forwarding) and DevTools.
      */
     function speak(text) {
         // Android native bridge (requires APK rebuilt with TTSBridge.kt)
         if (window.AndroidTTS && typeof window.AndroidTTS.speak === 'function') {
+            console.log('[TTS] speak(): AndroidTTS bridge -> "' + text + '"');
             window.AndroidTTS.speak(text);
             return;
         }
-        // Web Speech API fallback (browser dev / older APK)
+
+        // Web Speech API fallback (browser dev / APK without TTSBridge compiled in)
         if ('speechSynthesis' in window) {
+            const voices = speechSynthesis.getVoices();
+            const voice  = voices.find(v => v.lang.startsWith('en-'))
+                        || voices.find(v => v.lang.startsWith('en'));
+            console.log('[TTS] speak(): speechSynthesis path'
+                + ', text="' + text + '"'
+                + ', voices=' + voices.length
+                + ', voice=' + (voice ? voice.name + ' (' + voice.lang + ')' : 'default'));
+
             const utt  = new SpeechSynthesisUtterance(text);
             utt.pitch  = 0.9;
             utt.rate   = 0.85;
             utt.volume = volume;
-            // Attempt voice selection but do NOT block on voiceschanged --
-            // on Android WebView it may never fire.
-            const voices = speechSynthesis.getVoices();
-            const voice  = voices.find(v => v.lang.startsWith('en-'))
-                        || voices.find(v => v.lang.startsWith('en'));
             if (voice) utt.voice = voice;
+            utt.onerror = (e) => {
+                console.error('[TTS] SpeechSynthesisUtterance error: ' + e.error
+                    + ' for "' + text + '"');
+            };
             speechSynthesis.speak(utt);
+            return;
         }
+
+        console.warn('[TTS] speak(): no TTS available'
+            + ' (no AndroidTTS bridge, no speechSynthesis)'
+            + ', text="' + text + '"');
     }
 
     return {
