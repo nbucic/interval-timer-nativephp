@@ -3,8 +3,9 @@
 /**
  * Audio engine for the interval timer.
  *
- * soundMode = 'beep' → Web Audio API (synthesized, no network)
- * soundMode = 'voice' → Android TTS via window.AndroidTTS bridge (TTSBridge.kt)
+ * soundMode = 'beep'  -> Web Audio API (synthesized, no network)
+ * soundMode = 'voice' -> Android TTS via window.AndroidTTS bridge (TTSBridge.kt)
+ *                        Falls back to Web Speech API in browser dev.
  *
  * All methods are no-ops until the user has interacted with the page,
  * satisfying the browser AudioContext autoplay policy.
@@ -45,7 +46,7 @@ export function initAudio(volume = 0.8) {
     /** Single countdown beep (800 Hz, 100 ms). */
     function beep() { tone(800, 100); }
 
-    /** Prepare-phase beep — three rapid beeps at the same tone (800 Hz, 100 ms × 3). */
+    /** Prepare-phase beep -- three rapid beeps at the same tone (800 Hz, 100 ms x 3). */
     function prepareBeep() {
         tone(800, 100, 0);
         tone(800, 100, 150);
@@ -76,36 +77,33 @@ export function initAudio(volume = 0.8) {
     }
 
     /**
-     * Speak text via Android TTS bridge (window.AndroidTTS) when running
-     * inside the NativePHP WebView, with a Web Speech API fallback for
-     * browser-based development.
+     * Speak text via the Android TTS bridge (window.AndroidTTS, registered by
+     * TTSBridge.kt) when running inside the NativePHP WebView.
+     *
+     * Falls back to Web Speech API for browser-based development.
+     * Speaks immediately without waiting for voiceschanged -- on Android WebView
+     * that event may never fire, so we use whatever voices are already loaded
+     * (the default voice is fine if none are found).
      */
     function speak(text) {
-        // Android bridge registered by TTSBridge.kt
-        if (window.AndroidTTS?.speak) {
+        // Android native bridge (requires APK rebuilt with TTSBridge.kt)
+        if (window.AndroidTTS && typeof window.AndroidTTS.speak === 'function') {
             window.AndroidTTS.speak(text);
             return;
         }
-        // Browser fallback — voices load asynchronously, so wait for them
+        // Web Speech API fallback (browser dev / older APK)
         if ('speechSynthesis' in window) {
-            const utt = new SpeechSynthesisUtterance(text);
+            const utt  = new SpeechSynthesisUtterance(text);
             utt.pitch  = 0.9;
             utt.rate   = 0.85;
             utt.volume = volume;
-
-            const doSpeak = () => {
-                const voices = speechSynthesis.getVoices();
-                const voice  = voices.find(v => v.name.toLowerCase().includes('female'))
-                            || voices.find(v => v.lang.startsWith('en'));
-                if (voice) utt.voice = voice;
-                speechSynthesis.speak(utt);
-            };
-
-            if (speechSynthesis.getVoices().length > 0) {
-                doSpeak();
-            } else {
-                speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true });
-            }
+            // Attempt voice selection but do NOT block on voiceschanged --
+            // on Android WebView it may never fire.
+            const voices = speechSynthesis.getVoices();
+            const voice  = voices.find(v => v.lang.startsWith('en-'))
+                        || voices.find(v => v.lang.startsWith('en'));
+            if (voice) utt.voice = voice;
+            speechSynthesis.speak(utt);
         }
     }
 
