@@ -19,6 +19,10 @@ document.addEventListener('alpine:init', () => {
             this.program      = this.$wire.program;
             this.audio        = initAudio(this.volume);
 
+            console.log('[TTS] timerAudio init: soundMode=' + this.soundMode
+                + ', keepScreenOn=' + this.keepScreenOn
+                + ', AndroidTTS=' + !!(window.AndroidTTS && typeof window.AndroidTTS.speak === 'function'));
+
             // Ticker logic: poll wire.tick() every 1 000 ms when the timer is active
             this.$watch('$wire.state', state => {
                 console.log('State changed:', state);
@@ -35,7 +39,9 @@ document.addEventListener('alpine:init', () => {
             this.$wire.on('playBeep', ({reason}) => {
                 console.log('playBeep', reason);
                 if (this.soundMode === 'voice') {
-                    this.audio.speak(this.voiceText(reason));
+                    const text = this.voiceText(reason);
+                    console.log('[TTS] playBeep: reason=' + reason + ', voiceText="' + text + '"');
+                    this.audio.speak(text);
                 } else if (reason === 'prepare') {
                     this.audio.prepareBeep();
                 } else {

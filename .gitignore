@@ -27,3 +27,6 @@ Thumbs.db
 /database/database.sqlite
 /app-release-signed.apk*
 /my-release-key*
+
+# Credential files (keystores, private keys, etc.)
+/credentials/
