@@ -1,5 +1,6 @@
 import './bootstrap';
-import { initAudio } from './audio';
+import {initAudio} from './audio';
+import audioTTS from "../../packages/nbucic/audio-tts/resources/js/audioTTS.js";
 
 // Boot Alpine after Livewire (Livewire v3 integrates automatically)
 document.addEventListener('alpine:init', () => {
@@ -13,35 +14,35 @@ document.addEventListener('alpine:init', () => {
         _wakeLock: null,
 
         init() {
-            this.soundMode    = this.$wire.soundMode;
-            this.volume       = this.$wire.volume;
+            this.soundMode = this.$wire.soundMode;
+            this.volume = this.$wire.volume;
             this.keepScreenOn = this.$wire.keepScreenOn;
-            this.program      = this.$wire.program;
-            this.audio        = initAudio(this.volume);
+            this.program = this.$wire.program;
+            this.audio = initAudio(this.volume);
 
             console.log('[TTS] timerAudio init: soundMode=' + this.soundMode
                 + ', keepScreenOn=' + this.keepScreenOn
-                + ', AndroidTTS=' + !!(window.AndroidTTS && typeof window.AndroidTTS.speak === 'function'));
+                + ', AndroidTTS=' + (typeof audioTTS.speak === 'function'));
 
             // Ticker logic: poll wire.tick() every 1 000 ms when the timer is active
-            this.$watch('$wire.state', state => {
+            this.$watch('$wire.state', async state => {
                 console.log('State changed:', state);
 
                 clearInterval(this.interval);
                 if (['PREPARE', 'RUNNING', 'PAUSE', 'COOLDOWN'].includes(state)) {
                     this.interval = setInterval(() => this.$wire.tick(), 1000);
-                    this._acquireWakeLock();
+                    await this._acquireWakeLock();
                 } else {
-                    this._releaseWakeLock();
+                    await this._releaseWakeLock();
                 }
             });
 
-            this.$wire.on('playBeep', ({reason}) => {
-                console.log('playBeep', reason);
+            this.$wire.on('playBeep', async ({reason}) => {
+                console.log(`Beep, reason: ${reason}, mode: ${this.soundMode}`);
                 if (this.soundMode === 'voice') {
                     const text = this.voiceText(reason);
                     console.log('[TTS] playBeep: reason=' + reason + ', voiceText="' + text + '"');
-                    this.audio.speak(text);
+                    await audioTTS.speak(text);
                 } else if (reason === 'prepare') {
                     this.audio.prepareBeep();
                 } else {
@@ -66,7 +67,7 @@ document.addEventListener('alpine:init', () => {
                 if (soundMode !== undefined) this.soundMode = soundMode;
                 if (volume !== undefined) {
                     this.volume = volume;
-                    this.audio  = initAudio(volume);
+                    this.audio = initAudio(volume);
                 }
                 if (keepScreenOn !== undefined) this.keepScreenOn = keepScreenOn;
             });
@@ -74,10 +75,10 @@ document.addEventListener('alpine:init', () => {
 
         voiceText(reason) {
             const map = {
-                prepare:      this.$wire?.countdownLabel ?? '',
-                countdown:    this.$wire?.countdownLabel ?? 'Get ready',
-                rep_end:      'Done',
-                pause_end:    'Go',
+                prepare: this.$wire?.countdownLabel ?? '',
+                countdown: this.$wire?.countdownLabel ?? 'Get ready',
+                rep_end: 'Done',
+                pause_end: 'Go',
                 cooldown_end: 'Next',
             };
             return map[reason] ?? 'Beep';
@@ -90,7 +91,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 this._wakeLock = await navigator.wakeLock.request('screen');
                 console.log('Wake lock acquired');
-                // Re-acquire automatically if the OS releases it (e.g. tab hidden then shown)
+                // Re-acquire automatically if the OS releases it (e.g., tab hidden then shown)
                 this._wakeLock.addEventListener('release', () => {
                     this._wakeLock = null;
                 });
@@ -115,20 +116,24 @@ document.addEventListener('alpine:init', () => {
         volume: 0.8,
 
         init() {
-            console.log('settings sounds');
             this.soundMode = this.$wire.soundMode;
             this.volume = this.$wire.volume;
-            this.audio        = initAudio(1);
+            this.audio = initAudio(1);
 
             this.$wire.on('playBeepSound', ({sound}) => {
-                console.log('DEMO');
-                debugger;
+                console.log('Playing beep sound');
                 if (sound === 'triple') {
                     this.audio.tripleBeep();
                 } else {
                     this.audio.chime();
                 }
             });
+
+            this.$wire.on('play-TTS-Sound', ({text}) => {
+                console.log('Playing ho ho ho');
+                audioTTS.speak(text).then(() => {
+                });
+            })
         }
     }))
 });

@@ -6,22 +6,24 @@ namespace App\Livewire;
 
 use App\Enum\BeepLeadIn;
 use App\Models\Setting;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
-use Nbucic\AudioTts\AudioTTS;
 
 #[Layout('layouts.app')]
 #[Title('Settings — Interval Timer')]
 class Settings extends Component
 {
     public BeepLeadIn $defaultBeepLeadIn = BeepLeadIn::Three;
+
     public string $defaultEndSound = 'triple';
+
     public string $soundMode = 'beep';
+
     public float $volume = 0.8;
+
     public bool $keepScreenOn = true;
 
     public bool $saved = false;
@@ -69,14 +71,13 @@ class Settings extends Component
 
     public function updateAndTest(string $soundMode): void
     {
-        Log::info('Updating settings and testing voice mode...');
         $this->soundMode = $soundMode;
-        if ($soundMode === 'voice') {
-            \Nbucic\AudioTts\Facades\AudioTTS::speak('Where is Darth Vader now?', 1.0);
-//            $this->dispatch('playVoiceSound', reason: 'test');
-        } else {
-            $this->dispatch('playBeepSound', sound: 'chime');
+        if (app()->isLocal()) {
+            if ($soundMode === 'voice') {
+                $this->dispatch('play-TTS-Sound', text: '3, 2, 1, - GO');
+            } else {
+                $this->dispatch('playBeepSound', sound: 'triple');
+            }
         }
-        Log::info('Updating settings and testing voice mode... [DONE]');
     }
 }

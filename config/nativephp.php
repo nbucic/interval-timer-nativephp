@@ -275,6 +275,7 @@ return [
             'resources',
             'routes',
             'config',
+            'database',
             'public',
         ],
 

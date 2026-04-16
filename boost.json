@@ -1,0 +1,22 @@
+{
+    "agents": [
+        "junie",
+        "claude_code",
+        "gemini"
+    ],
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch_mcp": false,
+    "packages": [
+        "nbucic/audio-tts",
+        "nativephp/mobile"
+    ],
+    "sail": false,
+    "skills": [
+        "laravel-best-practices",
+        "livewire-development",
+        "pest-testing",
+        "tailwindcss-development",
+        "nativephp-mobile"
+    ]
+}

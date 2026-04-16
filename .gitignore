@@ -30,3 +30,13 @@ Thumbs.db
 
 # Credential files (keystores, private keys, etc.)
 /credentials/
+
+/* AI */
+.agents
+.mcp.json
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.claude
+.junie
+.gemini
