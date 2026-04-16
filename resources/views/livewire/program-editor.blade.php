@@ -251,19 +251,18 @@
                                           {{ $this->editingIsLastPhase() ? 'text-gray-600' : 'text-gray-400' }}">
                                 Cooldown (sec)
                             </label>
-                            <p class="text-[10px] mb-1 {{ $this->editingIsLastPhase() ? 'text-gray-700' : 'text-gray-600' }}">
+                            <p class="text-[14px] mb-1 {{ $this->editingIsLastPhase() ? 'text-gray-700' : 'text-gray-600' }}">
                                 @if($this->editingIsLastPhase())
-                                    not counted — add another phase
+                                    The cooldown period for the last phase will not be counted in total duration
                                 @else
                                     After final rep
                                 @endif
                             </p>
                             <input type="number" wire:model="phaseCooldown" min="0" max="3600"
-                                   @if($this->editingIsLastPhase()) disabled @endif
                                    class="w-full rounded-xl px-4 py-3 border text-center text-lg font-bold
                                           focus:outline-none transition-colors
                                           {{ $this->editingIsLastPhase()
-                                              ? 'bg-gray-800/40 text-gray-600 border-white/5 cursor-not-allowed'
+                                              ? 'bg-gray-800/40 text-gray-600 border-white/5'
                                               : 'bg-gray-800 text-white border-white/10 focus:border-blue-500' }}">
                         </div>
                     </div>

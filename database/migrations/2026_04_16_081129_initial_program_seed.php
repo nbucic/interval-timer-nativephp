@@ -6,7 +6,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
@@ -37,10 +38,10 @@ return new class extends Migration {
         ]);
 
         foreach ([
-                     ['label' => 'Warmup', 'duration' => 10, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 5, 'color' => '#3b82f6'],
-                     ['label' => 'Sprint', 'duration' => 8, 'repetitions' => 3, 'pause' => 4, 'cooldown' => 10, 'color' => '#ef4444'],
-                     ['label' => 'Stretch', 'duration' => 8, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#22c55e'],
-                 ] as $index => $phase) {
+            ['label' => 'Warmup', 'duration' => 10, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 5, 'color' => '#3b82f6'],
+            ['label' => 'Sprint', 'duration' => 8, 'repetitions' => 3, 'pause' => 4, 'cooldown' => 10, 'color' => '#ef4444'],
+            ['label' => 'Stretch', 'duration' => 8, 'repetitions' => 1, 'pause' => 0, 'cooldown' => 0, 'color' => '#22c55e'],
+        ] as $index => $phase) {
             DB::table('phases')->insert(
                 array_merge(
                     $phase,
@@ -51,8 +52,14 @@ return new class extends Migration {
                 ),
             );
         }
-    }
 
+        DB::table('programs')->insert([
+            'id' => Str::uuid7()->toString(),
+            'name' => 'Demo with no phases',
+            'beep_lead_in' => 3,
+            'end_sound' => 'triple',
+        ]);
+    }
 
     /**
      * Reverse the migrations.
