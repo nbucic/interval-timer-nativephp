@@ -1,5 +1,7 @@
 // noinspection JSUnresolvedReference
 
+import audioTTS from "../../packages/nbucic/audio-tts/resources/js/audioTTS.js";
+
 /**
  * Audio engine for the interval timer.
  *
@@ -85,39 +87,7 @@ export function initAudio(volume = 0.8) {
      * Android Logcat (via WebChromeClient console forwarding) and DevTools.
      */
     function speak(text) {
-        // Android native bridge (requires APK rebuilt with TTSBridge.kt)
-        if (window.AndroidTTS && typeof window.AndroidTTS.speak === 'function') {
-            console.log('[TTS] speak(): AndroidTTS bridge -> "' + text + '"');
-            window.AndroidTTS.speak(text);
-            return;
-        }
-
-        // Web Speech API fallback (browser dev / APK without TTSBridge compiled in)
-        if ('speechSynthesis' in window) {
-            const voices = speechSynthesis.getVoices();
-            const voice  = voices.find(v => v.lang.startsWith('en-'))
-                        || voices.find(v => v.lang.startsWith('en'));
-            console.log('[TTS] speak(): speechSynthesis path'
-                + ', text="' + text + '"'
-                + ', voices=' + voices.length
-                + ', voice=' + (voice ? voice.name + ' (' + voice.lang + ')' : 'default'));
-
-            const utt  = new SpeechSynthesisUtterance(text);
-            utt.pitch  = 0.9;
-            utt.rate   = 0.85;
-            utt.volume = volume;
-            if (voice) utt.voice = voice;
-            utt.onerror = (e) => {
-                console.error('[TTS] SpeechSynthesisUtterance error: ' + e.error
-                    + ' for "' + text + '"');
-            };
-            speechSynthesis.speak(utt);
-            return;
-        }
-
-        console.warn('[TTS] speak(): no TTS available'
-            + ' (no AndroidTTS bridge, no speechSynthesis)'
-            + ', text="' + text + '"');
+        return audioTTS.speak(text);
     }
 
     return {

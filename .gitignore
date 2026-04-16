@@ -23,7 +23,7 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
-/nativephp
+
 /database/database.sqlite
 /app-release-signed.apk*
 /my-release-key*

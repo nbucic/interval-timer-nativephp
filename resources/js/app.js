@@ -110,6 +110,27 @@ document.addEventListener('alpine:init', () => {
             this._wakeLock = null;
         },
     }));
+    Alpine.data('settingsSounds', () => ({
+        soundMode: 'beep',
+        volume: 0.8,
+
+        init() {
+            console.log('settings sounds');
+            this.soundMode = this.$wire.soundMode;
+            this.volume = this.$wire.volume;
+            this.audio        = initAudio(1);
+
+            this.$wire.on('playBeepSound', ({sound}) => {
+                console.log('DEMO');
+                debugger;
+                if (sound === 'triple') {
+                    this.audio.tripleBeep();
+                } else {
+                    this.audio.chime();
+                }
+            });
+        }
+    }))
 });
 
 // Alpine is automatically started by Livewire v3.
