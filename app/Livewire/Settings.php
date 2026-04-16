@@ -6,11 +6,13 @@ namespace App\Livewire;
 
 use App\Enum\BeepLeadIn;
 use App\Models\Setting;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Nbucic\AudioTts\AudioTTS;
 
 #[Layout('layouts.app')]
 #[Title('Settings — Interval Timer')]
@@ -29,10 +31,10 @@ class Settings extends Component
         $settings = Setting::current();
 
         $this->defaultBeepLeadIn = $settings->default_beep_lead_in;
-        $this->defaultEndSound   = $settings->default_end_sound;
-        $this->soundMode         = $settings->sound_mode;
-        $this->volume            = $settings->volume;
-        $this->keepScreenOn      = $settings->keep_screen_on;
+        $this->defaultEndSound = $settings->default_end_sound;
+        $this->soundMode = $settings->sound_mode;
+        $this->volume = $settings->volume;
+        $this->keepScreenOn = $settings->keep_screen_on;
     }
 
     public function render(): View
@@ -44,24 +46,37 @@ class Settings extends Component
     {
         $this->validate([
             'defaultBeepLeadIn' => ['required', new Enum(BeepLeadIn::class)],
-            'defaultEndSound'   => 'required|in:triple,chime',
-            'soundMode'         => 'required|in:beep,voice',
-            'volume'            => 'required|numeric|min:0|max:1',
-            'keepScreenOn'      => 'boolean',
+            'defaultEndSound' => 'required|in:triple,chime',
+            'soundMode' => 'required|in:beep,voice',
+            'volume' => 'required|numeric|min:0|max:1',
+            'keepScreenOn' => 'boolean',
         ]);
 
         $settings = Setting::current();
 
         $settings->default_beep_lead_in = $this->defaultBeepLeadIn;
-        $settings->default_end_sound    = $this->defaultEndSound;
-        $settings->sound_mode           = $this->soundMode;
-        $settings->volume               = round((float) $this->volume, 2);
-        $settings->keep_screen_on       = $this->keepScreenOn;
+        $settings->default_end_sound = $this->defaultEndSound;
+        $settings->sound_mode = $this->soundMode;
+        $settings->volume = round((float)$this->volume, 2);
+        $settings->keep_screen_on = $this->keepScreenOn;
 
         $settings->save();
 
         $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, keepScreenOn: $this->keepScreenOn, program: null);
 
         $this->saved = true;
+    }
+
+    public function updateAndTest(string $soundMode): void
+    {
+        Log::info('Updating settings and testing voice mode...');
+        $this->soundMode = $soundMode;
+        if ($soundMode === 'voice') {
+            \Nbucic\AudioTts\Facades\AudioTTS::speak('Where is Darth Vader now?', 1.0);
+//            $this->dispatch('playVoiceSound', reason: 'test');
+        } else {
+            $this->dispatch('playBeepSound', sound: 'chime');
+        }
+        Log::info('Updating settings and testing voice mode... [DONE]');
     }
 }

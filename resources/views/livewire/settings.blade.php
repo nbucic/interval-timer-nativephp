@@ -1,5 +1,6 @@
 @php use App\Enum\BeepLeadIn; @endphp
-<div class="flex flex-col h-full">
+<div class="flex flex-col h-full"
+    x-data="settingsSounds">
 
     <div class="flex items-center justify-between px-4 py-4">
         <h1 class="text-xl font-bold text-white">Settings</h1>
@@ -7,7 +8,11 @@
             wire:click="save"
             class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
         >
-            @if($saved) Saved ✓ @else Save @endif
+            @if($saved)
+                Saved ✓
+            @else
+                Save
+            @endif
         </button>
     </div>
 
@@ -23,7 +28,7 @@
                     <p class="text-white text-sm font-medium mb-3">Sound Mode</p>
                     <div class="grid grid-cols-2 gap-3">
                         <button
-                            wire:click="$set('soundMode', 'beep')"
+                            wire:click="updateAndTest('beep')"
                             class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all
                                    {{ $soundMode === 'beep' ? 'border-blue-500 bg-blue-500/10' : 'border-white/10 bg-gray-800' }}"
                         >
@@ -32,14 +37,15 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                       d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z"/>
                             </svg>
-                            <span class="text-sm font-semibold {{ $soundMode === 'beep' ? 'text-blue-400' : 'text-gray-400' }}">
+                            <span
+                                class="text-sm font-semibold {{ $soundMode === 'beep' ? 'text-blue-400' : 'text-gray-400' }}">
                                 Beep
                             </span>
                             <span class="text-[10px] text-gray-600 text-center">Web Audio API</span>
                         </button>
 
                         <button
-                            wire:click="$set('soundMode', 'voice')"
+                            wire:click="updateAndTest('voice')"
                             class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all
                                    {{ $soundMode === 'voice' ? 'border-blue-500 bg-blue-500/10' : 'border-white/10 bg-gray-800' }}"
                         >
@@ -48,7 +54,8 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                       d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z"/>
                             </svg>
-                            <span class="text-sm font-semibold {{ $soundMode === 'voice' ? 'text-blue-400' : 'text-gray-400' }}">
+                            <span
+                                class="text-sm font-semibold {{ $soundMode === 'voice' ? 'text-blue-400' : 'text-gray-400' }}">
                                 Voice
                             </span>
                             <span class="text-[10px] text-gray-600 text-center">Android TTS</span>
@@ -93,12 +100,14 @@
                             wire:click="$set('defaultBeepLeadIn', 3)"
                             class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors
                                    {{ $defaultBeepLeadIn === BeepLeadIn::Three ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400' }}"
-                        >3s</button>
+                        >3s
+                        </button>
                         <button
                             wire:click="$set('defaultBeepLeadIn', 5)"
                             class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors
                                    {{ $defaultBeepLeadIn === BeepLeadIn::Five ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400' }}"
-                        >5s</button>
+                        >5s
+                        </button>
                     </div>
                 </div>
 
@@ -113,12 +122,14 @@
                             wire:click="$set('defaultEndSound', 'triple')"
                             class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors
                                    {{ $defaultEndSound === 'triple' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400' }}"
-                        >Triple</button>
+                        >Triple
+                        </button>
                         <button
                             wire:click="$set('defaultEndSound', 'chime')"
                             class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors
                                    {{ $defaultEndSound === 'chime' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400' }}"
-                        >Chime</button>
+                        >Chime
+                        </button>
                     </div>
                 </div>
 

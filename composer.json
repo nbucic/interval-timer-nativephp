@@ -21,6 +21,7 @@
         "laravel/pail": "^1.2.5",
         "laravel/pint": "^1.27",
         "mockery/mockery": "^1.6",
+        "nbucic/audio-tts": "*@dev",
         "nunomaduro/collision": "^8.6",
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0",
@@ -56,6 +57,7 @@
             "@php artisan test"
         ],
         "build": [
+            "@php artisan config:clear --ansi",
             "@php artisan native:package android"
         ],
         "post-autoload-dump": [
@@ -92,5 +94,11 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "path",
+            "url": "/home/nikola/projects/private/interval-timer-nativephp/packages/nbucic/audio-tts"
+        }
+    ]
 }

@@ -1,0 +1,73 @@
+{
+    "name": "nbucic/audio-tts",
+    "version": "1.0.0",
+    "description": "An Audio TTS plugin for Android",
+    "namespace": "AudioTTS",
+    "keywords": [],
+    "category": "utilities",
+    "license": "MIT",
+    "pricing": {
+        "type": "free"
+    },
+    "author": {
+        "name": "Nikola Bucić",
+        "email": "nikola.bucic@gmail.com",
+        "url": "https://github.com/nbucic"
+    },
+    "homepage": "",
+    "repository": "",
+    "funding": [],
+    "platforms": [
+        "android",
+        "ios"
+    ],
+    "icon": "resources/icon.png",
+    "screenshots": [],
+    "bridge_functions": [
+        {
+            "name": "AudioTTS.Speak",
+            "android": "com.nbucic.plugins.audio_tts.AudioTTSFunctions.Speak",
+            "ios": "AudioTTSFunctions.Speak",
+            "description": "Speak text via Android TTS"
+        },
+        {
+            "name": "AudioTTS.GetStatus",
+            "android": "com.nbucic.plugins.audio_tts.AudioTTSFunctions.GetStatus",
+            "ios": "AudioTTSFunctions.GetStatus",
+            "description": "Return TTS engine readiness state"
+        }
+    ],
+    "android": {
+        "min_version": 21,
+        "permissions": [],
+        "repositories": [],
+        "dependencies": {
+            "implementation": []
+        },
+        "activities": [],
+        "services": [],
+        "receivers": [],
+        "providers": []
+    },
+    "ios": {
+        "min_version": "15.0",
+        "permissions": [],
+        "repositories": [],
+        "dependencies": {
+            "swift_packages": [],
+            "pods": []
+        }
+    },
+    "assets": {
+        "android": [],
+        "ios": []
+    },
+    "secrets": [],
+    "events": [
+        "Nbucic\\AudioTts\\Events\\AudioTTSCompleted"
+    ],
+    "service_provider": "Nbucic\\AudioTts\\AudioTTSServiceProvider",
+    "hooks": {
+        "copy_assets": "nativephp:audio-t-t-s:copy-assets"
+    }
+}
