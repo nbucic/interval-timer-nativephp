@@ -30,12 +30,6 @@ class Setting extends Model
     /** Returns the single settings row, creating it with defaults on first run. */
     public static function current(): self
     {
-        return self::first() ?? self::create([
-            'default_beep_lead_in' => BeepLeadIn::Three->value,
-            'default_end_sound'    => 'triple',
-            'sound_mode'           => 'beep',
-            'volume'               => 0.8,
-            'keep_screen_on'       => true,
-        ]);
+        return self::first();
     }
 }
