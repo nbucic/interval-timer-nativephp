@@ -18,19 +18,8 @@ jobs:
           extensions: zip, sqlite3, pdo_sqlite
           coverage: none
 
-      - name: Remove local path repositories (CI only)
-        run: |
-          # Strip path-type repository and audio-tts from composer.json
-          jq 'del(.repositories[] | select(.type == "path"))
-            | if .repositories == [] then del(.repositories) else . end
-            | del(."require-dev"."nbucic/audio-tts")' \
-            composer.json > tmp.json && mv tmp.json composer.json
-
-          # Remove audio-tts from composer.lock so install does not try to fetch the path
-          if [ -f composer.lock ]; then
-            jq 'del(."packages-dev"[] | select(.name == "nbucic/audio-tts"))' \
-              composer.lock > tmp.lock && mv tmp.lock composer.lock
-          fi
+      - name: Resolve local package path
+        run: composer update nbucic/audio-tts --no-install --no-interaction --quiet
 
       - name: Cache Composer dependencies
         uses: actions/cache@v4
