@@ -1,0 +1,54 @@
+name: Prepare PR — Bump Version
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  bump:
+    # Primary loop guard: skip when the bot itself pushed the last commit
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Check whether version is already bumped vs master
+        id: check
+        run: |
+          git fetch origin master --depth=1
+          BASE=$(git show origin/master:version.json | jq -r '.version')
+          HEAD=$(jq -r '.version' version.json)
+          echo "master=$BASE  pr-branch=$HEAD"
+          if [ "$BASE" = "$HEAD" ]; then
+            echo "needs_bump=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_bump=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump patch version
+        if: steps.check.outputs.needs_bump == 'true'
+        run: |
+          VERSION=$(jq -r '.version' version.json)
+          CODE=$(jq -r '.version_code' version.json)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          NEW_CODE=$((CODE + 1))
+          jq --arg v "$NEW_VERSION" --argjson c "$NEW_CODE" \
+            '.version = $v | .version_code = $c' version.json > tmp.json && mv tmp.json version.json
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Commit and push to PR branch
+        if: steps.check.outputs.needs_bump == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          git commit -m "chore: bump version to $NEW_VERSION"
+          git push origin HEAD:${{ github.head_ref }}
