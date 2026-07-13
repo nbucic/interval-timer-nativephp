@@ -24,6 +24,7 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0" \
             "platform-tools"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -73,7 +74,9 @@ jobs:
           NATIVEPHP_GRADLE_PATH: ${{ env.JAVA_HOME }}
           NATIVEPHP_ANDROID_SDK_LOCATION: ${{ env.ANDROID_SDK_ROOT }}
           NATIVEPHP_ANDROID_DEBUG_SYMBOLS: NONE
-        run: php artisan config:clear && php artisan native:package android
+        run: |
+          mkdir -p nativephp
+          php artisan config:clear && php artisan native:package android
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
