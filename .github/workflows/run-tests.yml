@@ -19,7 +19,7 @@ jobs:
           coverage: none
 
       - name: Resolve local package path
-        run: composer update nbucic/audio-tts --no-install --no-interaction --quiet
+        run: composer update nbucic/audio-tts --no-install --no-interaction --quiet --no-scripts
 
       - name: Cache Composer dependencies
         uses: actions/cache@v4
