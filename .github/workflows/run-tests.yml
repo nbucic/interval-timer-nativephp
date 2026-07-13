@@ -18,6 +18,12 @@ jobs:
           extensions: zip, sqlite3, pdo_sqlite
           coverage: none
 
+      - name: Remove local path repositories (CI only)
+        run: |
+          jq 'del(.repositories[] | select(.type == "path")) | del(."require-dev"."nbucic/audio-tts")' \
+            composer.json > tmp.json && mv tmp.json composer.json
+          composer update --lock --no-scripts --no-interaction --quiet
+
       - name: Cache Composer dependencies
         uses: actions/cache@v4
         with:
