@@ -12,6 +12,10 @@ return new class extends Migration {
      */
     public function up(): void
     {
+        if (app()->environment('testing')) {
+            return;
+        }
+
         DB::table('settings')->truncate();
 
         DB::table('settings')->insert([
@@ -53,8 +57,7 @@ return new class extends Migration {
     /**
      * Reverse the migrations.
      */
-    public
-    function down(): void
+    public function down(): void
     {
         //
     }
