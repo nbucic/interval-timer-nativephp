@@ -98,7 +98,7 @@
     "repositories": [
         {
             "type": "path",
-            "url": "/home/nikola/projects/private/interval-timer-nativephp/packages/nbucic/audio-tts"
+            "url": "./packages/nbucic/audio-tts"
         }
     ]
 }
