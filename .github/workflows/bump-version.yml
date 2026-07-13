@@ -1,38 +1,46 @@
-name: Bump Version
+name: Bump Version (Manual)
+
+# Automatic version bumping now happens inside the PR via prepare-pr.yml.
+# This workflow is kept as a manual escape hatch (e.g. after a hotfix
+# committed directly by an admin). It opens a PR so the bump goes through
+# the normal review flow and respects branch protection on master.
 
 on:
-  pull_request:
-    branches:
-      - master
-    types:
-      - closed
   workflow_dispatch:
 
 jobs:
   bump:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@v6
+      pull-requests: write
 
-      - name: Bump patch version and version_code
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bump patch version
         run: |
           VERSION=$(jq -r '.version' version.json)
           CODE=$(jq -r '.version_code' version.json)
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
           NEW_CODE=$((CODE + 1))
           jq --arg v "$NEW_VERSION" --argjson c "$NEW_CODE" \
             '.version = $v | .version_code = $c' version.json > tmp.json && mv tmp.json version.json
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-      - name: Commit bumped version
+      - name: Open PR with bumped version
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="chore/bump-version-$NEW_VERSION"
+          git checkout -b "$BRANCH"
           git add version.json
-          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-          git push
+          git commit -m "chore: bump version to $NEW_VERSION"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore: bump version to $NEW_VERSION" \
+            --body "Manual version bump triggered via workflow_dispatch." \
+            --base master --head "$BRANCH"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
