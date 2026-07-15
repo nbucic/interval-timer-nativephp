@@ -75,7 +75,7 @@ jobs:
         env:
           NATIVEPHP_GRADLE_PATH: ${{ env.JAVA_HOME }}
           NATIVEPHP_ANDROID_SDK_LOCATION: ${{ env.ANDROID_SDK_ROOT }}
-        run: php artisan native:install android
+        run: php artisan native:install android 2>&1 | cat; exit ${PIPESTATUS[0]}
 
       - name: Generate debug keystore
         run: |
@@ -94,8 +94,9 @@ jobs:
           ANDROID_KEY_ALIAS: androiddebugkey
           ANDROID_KEY_PASSWORD: android
         run: |
-          sudo chmod 0666 /dev/tty
-          php artisan config:clear && php artisan native:package android
+          php artisan config:clear
+          php artisan native:package android 2>&1 | cat
+          exit ${PIPESTATUS[0]}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
