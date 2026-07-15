@@ -93,7 +93,9 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: android
           ANDROID_KEY_ALIAS: androiddebugkey
           ANDROID_KEY_PASSWORD: android
-        run: php artisan config:clear && php artisan native:package android
+        run: |
+          sudo chmod 0666 /dev/tty
+          php artisan config:clear && php artisan native:package android
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
