@@ -95,8 +95,7 @@ jobs:
           ANDROID_KEY_PASSWORD: android
         run: |
           php artisan config:clear
-          php artisan native:package android 2>&1 | cat
-          exit ${PIPESTATUS[0]}
+          script -q -e -c "php artisan native:package android" /dev/null
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
