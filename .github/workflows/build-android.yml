@@ -77,10 +77,22 @@ jobs:
           NATIVEPHP_ANDROID_SDK_LOCATION: ${{ env.ANDROID_SDK_ROOT }}
         run: php artisan native:install android
 
+      - name: Generate debug keystore
+        run: |
+          mkdir -p ~/.android
+          keytool -genkey -v -keystore ~/.android/debug.keystore \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US" -noprompt
+
       - name: Build Android APK
         env:
           NATIVEPHP_GRADLE_PATH: ${{ env.JAVA_HOME }}
           NATIVEPHP_ANDROID_SDK_LOCATION: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_KEYSTORE_FILE: /home/runner/.android/debug.keystore
+          ANDROID_KEYSTORE_PASSWORD: android
+          ANDROID_KEY_ALIAS: androiddebugkey
+          ANDROID_KEY_PASSWORD: android
         run: php artisan config:clear && php artisan native:package android
 
       - name: Upload APK artifact
