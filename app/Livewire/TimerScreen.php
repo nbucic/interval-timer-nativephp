@@ -85,7 +85,7 @@ class TimerScreen extends Component
         $this->syncCursor($runner->cursor(), $program);
 
         $this->dispatch('topbar-title', title: $program->name);
-        $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, program: $program);
+        $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, keepScreenOn: $this->keepScreenOn, program: $program);
     }
 
     public function discard(): void
@@ -166,7 +166,7 @@ class TimerScreen extends Component
     public function requestSettings(): void
     {
         $program = $this->programId ? Program::with('phases')->find($this->programId) : null;
-        $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, program: $program);
+        $this->dispatch('settingsLoaded', soundMode: $this->soundMode, volume: $this->volume, keepScreenOn: $this->keepScreenOn, program: $program);
     }
 
     public function render(): View
