@@ -9,19 +9,29 @@
   <!-- Background -->
   <rect width="512" height="512" fill="#09090f"/>
 
-  <!-- Colored ring arcs at r=225, stroke-width=28 -->
+  <!-- Colored ring arcs at r=225, stroke-width=14 (half of original 28) -->
   <!-- Red: 0° to 90° (15 seconds) -->
   <path d="M 256 31 A 225 225 0 0 1 481 256"
-        stroke="#ef4444" stroke-width="28" fill="none" stroke-linecap="butt"/>
+        stroke="#ef4444" stroke-width="14" fill="none" stroke-linecap="butt"/>
   <!-- Blue: 90° to 288° (33 seconds, large-arc because 198°>180°) -->
   <path d="M 481 256 A 225 225 0 1 1 42.0 186.5"
-        stroke="#3b82f6" stroke-width="28" fill="none" stroke-linecap="butt"/>
+        stroke="#3b82f6" stroke-width="14" fill="none" stroke-linecap="butt"/>
   <!-- Green: 288° to 318° (5 seconds) -->
   <path d="M 42.0 186.5 A 225 225 0 0 1 105.4 88.8"
-        stroke="#22c55e" stroke-width="28" fill="none" stroke-linecap="butt"/>
+        stroke="#22c55e" stroke-width="14" fill="none" stroke-linecap="butt"/>
 
   <!-- Clock face -->
   <circle cx="256" cy="256" r="192" fill="url(#face-grad)"/>
+
+  <!-- Background text in upper portion -->
+  <text x="256" y="152"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="20"
+        font-weight="300"
+        letter-spacing="4"
+        fill="white"
+        opacity="0.18"
+        text-anchor="middle">I·N·T·E·R·V·A·L</text>
 
   <!-- Hour ticks (main at 0°, 90°, 180°, 270°; minor at rest) -->
   <line x1="256"   y1="78"    x2="256"   y2="101"   stroke="white" stroke-width="5"   opacity="0.7"/>
@@ -38,23 +48,18 @@
   <line x1="167"   y1="101.9" x2="171.5" y2="110"   stroke="white" stroke-width="2.5" opacity="0.35"/>
 
   <!-- Minute hand trail (at r=160, arcs ending at 252°) -->
-  <!-- widest/faintest: from 230° (133.4,358.8) to 252° (103.8,305.4) -->
   <path d="M 133.4 358.8 A 160 160 0 0 1 103.8 305.4"
         stroke="white" stroke-width="14" fill="none" stroke-linecap="round" opacity="0.12"/>
-  <!-- mid: from 240° (117.4,336) -->
   <path d="M 117.4 336 A 160 160 0 0 1 103.8 305.4"
         stroke="white" stroke-width="10" fill="none" stroke-linecap="round" opacity="0.28"/>
-  <!-- close: from 247° (108.7,318.5) -->
   <path d="M 108.7 318.5 A 160 160 0 0 1 103.8 305.4"
         stroke="white" stroke-width="7" fill="none" stroke-linecap="round" opacity="0.5"/>
 
   <!-- Hour hand: 3:42 = 111° from 12, length 110 -->
-  <!-- back=(237.3,248.8), tip=(358.7,295.4) -->
   <line x1="237.3" y1="248.8" x2="358.7" y2="295.4"
         stroke="white" stroke-width="14" stroke-linecap="round"/>
 
   <!-- Minute hand: 42 min = 252°, length 160 -->
-  <!-- back=(284.5,246.7), tip=(103.8,305.4) -->
   <line x1="284.5" y1="246.7" x2="103.8" y2="305.4"
         stroke="white" stroke-width="8" stroke-linecap="round"/>
 
