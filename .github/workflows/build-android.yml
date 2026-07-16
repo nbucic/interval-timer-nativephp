@@ -37,7 +37,7 @@ jobs:
           coverage: none
 
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: vendor
           key: ${{ runner.os }}-composer-no-dev-${{ hashFiles('composer.lock') }}
@@ -48,7 +48,7 @@ jobs:
         run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Cache npm dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: node_modules
           key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
