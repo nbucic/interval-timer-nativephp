@@ -23,15 +23,16 @@
   <!-- Clock face -->
   <circle cx="256" cy="256" r="192" fill="url(#face-grad)"/>
 
-  <!-- Background text in upper portion -->
-  <text x="256" y="152"
+  <!-- Background text aligned with 10 and 2 o'clock markers (y≈167) -->
+  <text x="256" y="167"
         font-family="Arial, Helvetica, sans-serif"
         font-size="20"
         font-weight="300"
         letter-spacing="4"
         fill="white"
         opacity="0.18"
-        text-anchor="middle">I·N·T·E·R·V·A·L</text>
+        text-anchor="middle"
+        dominant-baseline="middle">I·N·T·E·R·V·A·L</text>
 
   <!-- Hour ticks (main at 0°, 90°, 180°, 270°; minor at rest) -->
   <line x1="256"   y1="78"    x2="256"   y2="101"   stroke="white" stroke-width="5"   opacity="0.7"/>
