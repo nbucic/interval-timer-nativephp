@@ -22,7 +22,7 @@
 _ide_helper.php
 Homestead.json
 Homestead.yaml
-Thumbs.db
+Thumb.db
 
 /database/database.sqlite
 /app-release-signed.apk*
@@ -31,7 +31,7 @@ Thumbs.db
 # Credential files (keystores, private keys, etc.)
 /credentials/
 
-/* AI */
+# AI tools
 .agents
 .mcp.json
 CLAUDE.md
