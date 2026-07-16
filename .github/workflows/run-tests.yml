@@ -22,7 +22,7 @@ jobs:
         run: composer update nbucic/audio-tts --no-install --no-interaction --quiet --no-scripts
 
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: vendor
           key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
