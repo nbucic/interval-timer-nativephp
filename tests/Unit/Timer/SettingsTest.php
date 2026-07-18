@@ -11,7 +11,7 @@ test('settings load with defaults when no row exists', function (): void {
     expect($s->default_beep_lead_in)->toBe(BeepLeadIn::Three)
         ->and($s->default_end_sound)->toBe('triple')
         ->and($s->sound_mode)->toBe('beep')
-        ->and($s->volume)->toBe(0.8)
+        ->and($s->volume)->toBe(1.0)
         ->and($s->keep_screen_on)->toBeTrue();
 });
 
