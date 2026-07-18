@@ -1,7 +1,7 @@
 /**
  * Audio engine for the interval timer.
  */
-export function initAudio(volume = 0.8) {
+export function initAudio(volume = 1.0) {
     volume = Math.max(0, Math.min(1, volume));
     let ctx = null;
 
@@ -25,7 +25,7 @@ export function initAudio(volume = 0.8) {
 
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, start);
-        gain.gain.setValueAtTime(volume * 0.6, start);
+        gain.gain.setValueAtTime(volume, start);
         gain.gain.exponentialRampToValueAtTime(0.001, end);
 
         osc.connect(gain);

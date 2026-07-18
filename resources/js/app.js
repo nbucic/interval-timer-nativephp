@@ -8,7 +8,7 @@ document.addEventListener('alpine:init', () => {
         timer: null,
         audio: null,
         soundMode: 'beep',
-        volume: 0.8,
+        volume: 1.0,
         keepScreenOn: true,
         interval: null,
         _wakeLock: null,
@@ -42,11 +42,11 @@ document.addEventListener('alpine:init', () => {
                 if (this.soundMode === 'voice') {
                     const text = this.voiceText(reason);
                     console.log('[TTS] playBeep: reason=' + reason + ', voiceText="' + text + '"');
-                    await audioTTS.speak(text);
+                    await audioTTS.speak(text, this.volume);
                 } else if (reason === 'prepare') {
-                    this.audio.prepareBeep();
-                } else {
                     this.audio.beep();
+                } else {
+                    this.audio.prepareBeep();
                 }
             });
 
@@ -113,7 +113,7 @@ document.addEventListener('alpine:init', () => {
     }));
     Alpine.data('settingsSounds', () => ({
         soundMode: 'beep',
-        volume: 0.8,
+        volume: 1.0,
 
         init() {
             this.soundMode = this.$wire.soundMode;
