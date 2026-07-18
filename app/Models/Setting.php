@@ -34,7 +34,7 @@ class Setting extends Model
             'default_beep_lead_in' => BeepLeadIn::Three,
             'default_end_sound'    => 'triple',
             'sound_mode'           => 'beep',
-            'volume'               => 0.8,
+            'volume'               => 1.0,
             'keep_screen_on'       => true,
         ]);
     }

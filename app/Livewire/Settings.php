@@ -22,7 +22,7 @@ class Settings extends Component
 
     public string $soundMode = 'beep';
 
-    public float $volume = 0.8;
+    public float $volume = 1.0;
 
     public bool $keepScreenOn = true;
 
